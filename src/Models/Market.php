@@ -10,12 +10,16 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $city
  * @property string|null $region one of Market::REGIONS
  * @property string|null $market_type
- * @property string|null $address
+ * @property string|null $address_line1
+ * @property string|null $address_line2
+ * @property string|null $province
+ * @property string|null $postal_code
  * @property string|null $frequency 'one_time'|'weekly'|'biweekly'|'monthly'|'seasonal'|'other'
  * @property string|null $frequency_detail
  * @property string|null $vendor_fees
  * @property string|null $phone
  * @property string|null $manager
+ * @property string|null $manager_phone
  * @property string|null $manager_email
  * @property string|null $facebook_page
  * @property string|null $instagram_page
@@ -77,12 +81,16 @@ class Market extends Model
         'city',
         'region',
         'market_type',
-        'address',
+        'address_line1',
+        'address_line2',
+        'province',
+        'postal_code',
         'frequency',
         'frequency_detail',
         'vendor_fees',
         'phone',
         'manager',
+        'manager_phone',
         'manager_email',
         'facebook_page',
         'instagram_page',

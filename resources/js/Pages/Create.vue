@@ -1,6 +1,15 @@
 <template>
   <div class="md:pt-6 pb-6">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- No base px-4 here -- AdminLayout's own <main> wrapper already sits
+         at px-0 on mobile (sm:px-6 lg:px-8 only from sm up) precisely so
+         pages don't get a second, redundant side margin stacked on top of
+         it; a page-local px-4 here would just reintroduce the margin the
+         layout deliberately avoids. AdminMobileHeader and the card below
+         both go full-bleed on mobile as a result, matching Index.vue
+         (which never had this wrapper at all) -- their own internal
+         padding (AdminMobileHeader's px-4, the form's p-6) is what
+         provides breathing room, not an outer margin. -->
+    <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
       <AdminMobileHeader title="Add Market" :href="route('admin.market.index')" />
 
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
@@ -38,24 +47,49 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market Type</label>
-                <input v-model="form.market_type" type="text" list="market-type-options" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="e.g. Farmers, Artisan, Makers" />
-                <datalist id="market-type-options">
-                  <option v-for="t in props.marketTypes" :key="t" :value="t" />
-                </datalist>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                <input v-model="form.address" type="text" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
-              </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market Type</label>
+              <input v-model="form.market_type" type="text" list="market-type-options" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="e.g. Farmers, Artisan, Makers" />
+              <datalist id="market-type-options">
+                <option v-for="t in props.marketTypes" :key="t" :value="t" />
+              </datalist>
             </div>
 
             <label class="tap-target-touch flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700" />
               Active
             </label>
+          </div>
+
+          <!-- Split rather than one free-text line so this can eventually be
+               filled by Canada Post's AddressComplete widget (it returns
+               exactly this shape: street line, optional unit/suite line,
+               province, postal code) -- City above already covers the city
+               part and doubles as a filter/index field, so isn't repeated
+               here. -->
+          <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Address</h2>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Street Address</label>
+              <input v-model="form.address_line1" type="text" autocomplete="address-line1" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="e.g. 100 Ross St" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit / Suite</label>
+              <input v-model="form.address_line2" type="text" autocomplete="address-line2" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Province</label>
+                <input v-model="form.province" type="text" autocomplete="address-level1" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Postal Code</label>
+                <input v-model="form.postal_code" type="text" autocomplete="postal-code" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="V1E 4N2" />
+              </div>
+            </div>
           </div>
 
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -78,14 +112,19 @@
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Contact</h2>
 
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market Phone</label>
+              <input v-model="form.phone" type="tel" inputmode="tel" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="General/public line" />
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone</label>
-                <input v-model="form.phone" type="tel" inputmode="tel" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
-              </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Manager</label>
                 <input v-model="form.manager" type="text" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Manager Phone</label>
+                <input v-model="form.manager_phone" type="tel" inputmode="tel" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="Direct line, if different" />
               </div>
             </div>
 
@@ -171,12 +210,16 @@ interface FormData {
   city: string
   region: string | null
   market_type: string
-  address: string
+  address_line1: string
+  address_line2: string
+  province: string
+  postal_code: string
   frequency: string | null
   frequency_detail: string
   vendor_fees: string
   phone: string
   manager: string
+  manager_phone: string
   manager_email: string
   facebook_page: string
   instagram_page: string
@@ -192,12 +235,18 @@ const form = useForm<FormData>({
   city: '',
   region: null,
   market_type: '',
-  address: '',
+  address_line1: '',
+  address_line2: '',
+  // Overwhelming default for this BC-only directory -- not enforced,
+  // just saves re-typing it on every single market.
+  province: 'BC',
+  postal_code: '',
   frequency: null,
   frequency_detail: '',
   vendor_fees: '',
   phone: '',
   manager: '',
+  manager_phone: '',
   manager_email: '',
   facebook_page: '',
   instagram_page: '',

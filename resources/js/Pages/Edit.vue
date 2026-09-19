@@ -1,6 +1,15 @@
 <template>
   <div class="md:pt-6 pb-6">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- No base px-4 here -- AdminLayout's own <main> wrapper already sits
+         at px-0 on mobile (sm:px-6 lg:px-8 only from sm up) precisely so
+         pages don't get a second, redundant side margin stacked on top of
+         it; a page-local px-4 here would just reintroduce the margin the
+         layout deliberately avoids. AdminMobileHeader and the card below
+         both go full-bleed on mobile as a result, matching Index.vue
+         (which never had this wrapper at all) -- their own internal
+         padding (AdminMobileHeader's px-4, the form's p-6) is what
+         provides breathing room, not an outer margin. -->
+    <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
       <AdminMobileHeader title="Edit Market" :href="route('admin.market.index')" />
 
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
@@ -38,24 +47,43 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market Type</label>
-                <input v-model="form.market_type" type="text" list="market-type-options" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
-                <datalist id="market-type-options">
-                  <option v-for="t in props.marketTypes" :key="t" :value="t" />
-                </datalist>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                <input v-model="form.address" type="text" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
-              </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market Type</label>
+              <input v-model="form.market_type" type="text" list="market-type-options" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              <datalist id="market-type-options">
+                <option v-for="t in props.marketTypes" :key="t" :value="t" />
+              </datalist>
             </div>
 
             <label class="tap-target-touch flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700" />
               Active
             </label>
+          </div>
+
+          <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Address</h2>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Street Address</label>
+              <input v-model="form.address_line1" type="text" autocomplete="address-line1" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit / Suite</label>
+              <input v-model="form.address_line2" type="text" autocomplete="address-line2" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Province</label>
+                <input v-model="form.province" type="text" autocomplete="address-level1" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Postal Code</label>
+                <input v-model="form.postal_code" type="text" autocomplete="postal-code" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              </div>
+            </div>
           </div>
 
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -78,14 +106,19 @@
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Contact</h2>
 
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market Phone</label>
+              <input v-model="form.phone" type="tel" inputmode="tel" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="General/public line" />
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone</label>
-                <input v-model="form.phone" type="tel" inputmode="tel" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
-              </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Manager</label>
                 <input v-model="form.manager" type="text" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Manager Phone</label>
+                <input v-model="form.manager_phone" type="tel" inputmode="tel" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="Direct line, if different" />
               </div>
             </div>
 
@@ -166,12 +199,16 @@ interface MarketDetail {
   city: string | null
   region: string | null
   market_type: string | null
-  address: string | null
+  address_line1: string | null
+  address_line2: string | null
+  province: string | null
+  postal_code: string | null
   frequency: string | null
   frequency_detail: string | null
   vendor_fees: string | null
   phone: string | null
   manager: string | null
+  manager_phone: string | null
   manager_email: string | null
   facebook_page: string | null
   instagram_page: string | null
@@ -197,12 +234,16 @@ const form = useForm({
   city: props.market.city ?? '',
   region: props.market.region,
   market_type: props.market.market_type ?? '',
-  address: props.market.address ?? '',
+  address_line1: props.market.address_line1 ?? '',
+  address_line2: props.market.address_line2 ?? '',
+  province: props.market.province ?? '',
+  postal_code: props.market.postal_code ?? '',
   frequency: props.market.frequency,
   frequency_detail: props.market.frequency_detail ?? '',
   vendor_fees: props.market.vendor_fees ?? '',
   phone: props.market.phone ?? '',
   manager: props.market.manager ?? '',
+  manager_phone: props.market.manager_phone ?? '',
   manager_email: props.market.manager_email ?? '',
   facebook_page: props.market.facebook_page ?? '',
   instagram_page: props.market.instagram_page ?? '',
