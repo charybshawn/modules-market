@@ -215,11 +215,18 @@ const columns = computed<Column[]>(() => [
   },
   { key: 'phone', label: 'Phone', hideable: true },
   {
+    // No "Not checked" option here, deliberately -- DataTable's own
+    // isFilterValueActive() treats an empty-string filter value as "no
+    // filter selected" (confirmed live: selecting an option bound to ''
+    // silently filters nothing, since it reads as identical to Any). That
+    // collides with String(null ?? '') also being '', which is what a
+    // genuinely unchecked market's score compares as -- there's no value
+    // this column's own options can carry that both means "unchecked" to
+    // the comparison AND registers as "a filter is active" to DataTable.
+    // Sort ascending on this column instead to find unchecked/low-score
+    // markets (they sort first).
     key: 'liveness_score', label: 'Liveness', sortable: true, hideable: true, filterable: true,
-    options: [
-      { value: '', label: 'Not checked' },
-      ...Object.entries(props.livenessLabels).map(([value, label]) => ({ value, label: `${value}/4 · ${label}` })),
-    ],
+    options: Object.entries(props.livenessLabels).map(([value, label]) => ({ value, label: `${value}/4 · ${label}` })),
   },
 ])
 
