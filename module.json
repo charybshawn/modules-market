@@ -1,0 +1,11 @@
+{
+    "package": "cultpantry/market",
+    "name": "Farmer's Markets",
+    "description": "Directory of artisan farmer's markets in British Columbia — manage listings, filter by city/region, bulk import via XML.",
+    "publish_tag": "market-pages",
+    "provider": "Cultpantry\\Market\\MarketServiceProvider",
+    "tables": [
+        "market_markets"
+    ],
+    "table_prefix": "market_"
+}
