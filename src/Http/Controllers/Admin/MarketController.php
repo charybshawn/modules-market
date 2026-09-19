@@ -50,6 +50,7 @@ class MarketController extends Controller implements HasMiddleware
             'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
+            'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
     }
 
@@ -62,6 +63,7 @@ class MarketController extends Controller implements HasMiddleware
             'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
+            'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
     }
 
@@ -86,6 +88,7 @@ class MarketController extends Controller implements HasMiddleware
             'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
+            'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
     }
 
@@ -163,6 +166,8 @@ class MarketController extends Controller implements HasMiddleware
             'description' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'sources' => ['nullable', 'string'],
+            'liveness_score' => ['nullable', 'integer', 'min:0', 'max:4'],
+            'liveness_checked_at' => ['nullable', 'date'],
             'is_active' => ['boolean'],
         ]);
     }

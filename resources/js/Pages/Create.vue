@@ -173,6 +173,21 @@
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Sources</label>
               <textarea v-model="form.sources" rows="2" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="Where this data came from -- one URL/note per line"></textarea>
             </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Liveness Score</label>
+                <select v-model="form.liveness_score" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm">
+                  <option :value="null">Not checked</option>
+                  <option v-for="(label, score) in props.livenessLabels" :key="score" :value="Number(score)">{{ score }}/4 &middot; {{ label }}</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">How confident a check is that this market still actually runs -- see the find-bc-markets skill for how this gets scored.</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Checked On</label>
+                <input v-model="form.liveness_checked_at" type="date" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              </div>
+            </div>
           </div>
 
           <div class="flex items-center justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -201,6 +216,7 @@ interface Props {
   regions: string[]
   marketTypes: string[]
   frequencies: Record<string, string>
+  livenessLabels: Record<number, string>
 }
 
 const props = defineProps<Props>()
@@ -227,6 +243,8 @@ interface FormData {
   description: string
   notes: string
   sources: string
+  liveness_score: number | null
+  liveness_checked_at: string
   is_active: boolean
 }
 
@@ -254,6 +272,8 @@ const form = useForm<FormData>({
   description: '',
   notes: '',
   sources: '',
+  liveness_score: null,
+  liveness_checked_at: '',
   is_active: true,
 })
 

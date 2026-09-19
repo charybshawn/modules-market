@@ -138,6 +138,18 @@
           <template #cell-phone="{ item }">
             <span class="text-sm text-gray-500 dark:text-gray-400">{{ item.phone ?? '—' }}</span>
           </template>
+
+          <template #cell-liveness_score="{ item }">
+            <span v-if="item.liveness_score === null" class="text-sm text-gray-400 dark:text-gray-500">Not checked</span>
+            <span v-else class="inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+              <span
+                class="w-2 h-2 rounded-full flex-shrink-0"
+                :class="livenessDotClass(item.liveness_score)"
+                :title="`Checked ${item.liveness_checked_at ? item.liveness_checked_at.slice(0, 10) : 'at an unknown date'}`"
+              ></span>
+              {{ item.liveness_score }}/4 · {{ livenessLabel(item.liveness_score) }}
+            </span>
+          </template>
         </DataTable>
       </div>
     </div>
@@ -162,6 +174,8 @@ interface MarketRow {
   market_type: string | null
   frequency: string | null
   phone: string | null
+  liveness_score: number | null
+  liveness_checked_at: string | null
   is_active: boolean
 }
 
@@ -171,11 +185,24 @@ interface Props {
   regions: string[]
   marketTypes: string[]
   frequencies: Record<string, string>
+  livenessLabels: Record<number, string>
 }
 
 const props = defineProps<Props>()
 
 const frequencyLabel = (value: string) => props.frequencies[value] ?? value
+const livenessLabel = (score: number) => props.livenessLabels[score] ?? 'Unknown'
+
+// Matches the skill's own scoring bands (see .claude/skills/find-bc-markets/
+// SKILL.md): 4 reads as confidently active, 2-3 as probably active with
+// gaps, 0-1 as likely defunct -- the dot is just that band at a glance,
+// the "Not checked" case (null) gets no dot at all rather than a 4th color,
+// since "unknown" isn't a point on the same red-to-green scale.
+const livenessDotClass = (score: number) => {
+  if (score >= 4) return 'bg-emerald-500 dark:bg-emerald-400'
+  if (score >= 2) return 'bg-amber-500 dark:bg-amber-400'
+  return 'bg-red-500 dark:bg-red-400'
+}
 
 const columns = computed<Column[]>(() => [
   { key: 'name', label: 'Market', sortable: true },
@@ -187,6 +214,13 @@ const columns = computed<Column[]>(() => [
     options: Object.entries(props.frequencies).map(([value, label]) => ({ value, label })),
   },
   { key: 'phone', label: 'Phone', hideable: true },
+  {
+    key: 'liveness_score', label: 'Liveness', sortable: true, hideable: true, filterable: true,
+    options: [
+      { value: '', label: 'Not checked' },
+      ...Object.entries(props.livenessLabels).map(([value, label]) => ({ value, label: `${value}/4 · ${label}` })),
+    ],
+  },
 ])
 
 // A plain useForm (not usePersistedForm) -- a File object can't be

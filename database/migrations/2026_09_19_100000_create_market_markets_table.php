@@ -54,6 +54,15 @@ return new class extends Migration
             // not a separate table for v1; revisit if per-source structure
             // (timestamps, per-source status) is ever needed.
             $table->text('sources')->nullable();
+            // 0-4, see Market::LIVENESS_LABELS -- how confident a check (the
+            // find-bc-markets skill's research pass, or a manual admin
+            // re-verify) is that this market is still actually running, not
+            // just still sitting in an old directory listing.
+            // liveness_checked_at is when that score was last determined,
+            // so a stale 4/4 from over a year ago reads differently than a
+            // fresh one -- null on both means never checked.
+            $table->unsignedTinyInteger('liveness_score')->nullable();
+            $table->date('liveness_checked_at')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
@@ -61,6 +70,7 @@ return new class extends Migration
             $table->index('region');
             $table->index('market_type');
             $table->index('frequency');
+            $table->index('liveness_score');
         });
     }
 

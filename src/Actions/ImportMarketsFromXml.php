@@ -4,6 +4,7 @@ namespace Cultpantry\Market\Actions;
 
 use Cultpantry\Market\Models\Market;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 use SimpleXMLElement;
 
@@ -64,6 +65,8 @@ class ImportMarketsFromXml
                 $region = null;
             }
 
+            $livenessScore = $this->livenessScore($node);
+
             $market->fill([
                 ...$matchOn,
                 'region' => $region,
@@ -85,6 +88,8 @@ class ImportMarketsFromXml
                 'description' => $this->text($node, 'description'),
                 'notes' => $this->text($node, 'notes'),
                 'sources' => $this->text($node, 'sources'),
+                'liveness_score' => $livenessScore,
+                'liveness_checked_at' => $this->livenessCheckedAt($node, $livenessScore),
             ]);
 
             $market->save();
@@ -156,5 +161,45 @@ class ImportMarketsFromXml
         }
 
         return false;
+    }
+
+    /**
+     * 0-4 per Market::LIVENESS_LABELS -- an out-of-range or non-numeric
+     * value is treated the same as no value at all (null) rather than
+     * clamped or rejecting the whole row, since this field is advisory,
+     * not something an import should fail over.
+     */
+    private function livenessScore(SimpleXMLElement $node): ?int
+    {
+        $value = $this->text($node, 'liveness_score');
+        if ($value === null || ! ctype_digit($value)) {
+            return null;
+        }
+
+        $score = (int) $value;
+
+        return $score >= 0 && $score <= 4 ? $score : null;
+    }
+
+    /**
+     * Defaults to today when a liveness_score was given but no explicit
+     * date -- the import itself is effectively the moment that score was
+     * determined, in the normal case of a fresh find-bc-markets research
+     * pass being imported right away. An explicit <liveness_checked_at>
+     * (e.g. a re-import of older research) always wins over that default.
+     * No score at all means no default either -- both stay null together.
+     */
+    private function livenessCheckedAt(SimpleXMLElement $node, ?int $livenessScore): ?Carbon
+    {
+        $value = $this->text($node, 'liveness_checked_at');
+        if ($value !== null) {
+            try {
+                return Carbon::parse($value);
+            } catch (\Exception) {
+                // Falls through to the default-or-null handling below.
+            }
+        }
+
+        return $livenessScore !== null ? Carbon::today() : null;
     }
 }

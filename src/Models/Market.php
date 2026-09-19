@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $description
  * @property string|null $notes
  * @property string|null $sources
+ * @property int|null $liveness_score 0-4, see Market::LIVENESS_LABELS
+ * @property \Illuminate\Support\Carbon|null $liveness_checked_at
  * @property bool $is_active
  */
 class Market extends Model
@@ -76,6 +78,22 @@ class Market extends Model
         'Vancouver Island',
     ];
 
+    /**
+     * How confident a liveness check is that a market is still actually
+     * running -- see the find-bc-markets skill's scoring rubric
+     * (.claude/skills/find-bc-markets/SKILL.md in modules-costing) for how
+     * this gets computed during research. A plain 0-4 integer in the
+     * database (not this labeled form) so it stays easy to sort/filter on;
+     * these labels are for display only.
+     */
+    public const LIVENESS_LABELS = [
+        0 => 'Likely defunct',
+        1 => 'Likely defunct',
+        2 => 'Probably active',
+        3 => 'Probably active',
+        4 => 'Confirmed active',
+    ];
+
     protected $fillable = [
         'name',
         'city',
@@ -98,10 +116,14 @@ class Market extends Model
         'description',
         'notes',
         'sources',
+        'liveness_score',
+        'liveness_checked_at',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'liveness_score' => 'integer',
+        'liveness_checked_at' => 'date',
     ];
 }
