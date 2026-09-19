@@ -31,10 +31,10 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Region</label>
-                <input v-model="form.region" type="text" list="region-options" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
-                <datalist id="region-options">
-                  <option v-for="r in props.regions" :key="r" :value="r" />
-                </datalist>
+                <select v-model="form.region" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm">
+                  <option :value="null">—</option>
+                  <option v-for="r in props.regions" :key="r" :value="r">{{ r }}</option>
+                </select>
               </div>
             </div>
 
@@ -195,7 +195,7 @@ const props = defineProps<Props>()
 const form = useForm({
   name: props.market.name,
   city: props.market.city ?? '',
-  region: props.market.region ?? '',
+  region: props.market.region,
   market_type: props.market.market_type ?? '',
   address: props.market.address ?? '',
   frequency: props.market.frequency,

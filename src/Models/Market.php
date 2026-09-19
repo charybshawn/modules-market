@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $name
  * @property string|null $city
- * @property string|null $region
+ * @property string|null $region one of Market::REGIONS
  * @property string|null $market_type
  * @property string|null $address
  * @property string|null $frequency 'one_time'|'weekly'|'biweekly'|'monthly'|'seasonal'|'other'
@@ -42,6 +42,34 @@ class Market extends Model
         'monthly' => 'Monthly',
         'seasonal' => 'Seasonal',
         'other' => 'Other',
+    ];
+
+    /**
+     * Controlled list, not free text -- a blend of Destination BC's 6
+     * official tourism regions and well-known named sub-areas (Okanagan,
+     * Shuswap, Similkameen, Thompson) split out where markets actually
+     * cluster, since those narrower names are how BC markets get referred
+     * to locally far more often than the broad "Thompson Okanagan" region
+     * they technically sit inside. Shared with the Vue form's <select> and
+     * the filter dropdown the same way FREQUENCIES is.
+     */
+    public const REGIONS = [
+        'Boundary',
+        'Cariboo Chilcotin Coast',
+        'Fraser Valley',
+        'Kootenay Rockies',
+        'Metro Vancouver',
+        'Nechako',
+        'North Coast',
+        'Northern Rockies',
+        'Okanagan',
+        'Sea to Sky',
+        'Shuswap',
+        'Similkameen',
+        'Sunshine Coast',
+        'Thompson',
+        'Thompson Okanagan',
+        'Vancouver Island',
     ];
 
     protected $fillable = [

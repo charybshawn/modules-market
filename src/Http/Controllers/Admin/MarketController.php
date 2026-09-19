@@ -47,7 +47,7 @@ class MarketController extends Controller implements HasMiddleware
         return Inertia::render('Vendor/market/Index', [
             'markets' => $markets,
             'cities' => $this->knownValues('city'),
-            'regions' => $this->knownValues('region'),
+            'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
         ]);
@@ -59,7 +59,7 @@ class MarketController extends Controller implements HasMiddleware
 
         return Inertia::render('Vendor/market/Create', [
             'cities' => $this->knownValues('city'),
-            'regions' => $this->knownValues('region'),
+            'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
         ]);
@@ -83,7 +83,7 @@ class MarketController extends Controller implements HasMiddleware
         return Inertia::render('Vendor/market/Edit', [
             'market' => $market,
             'cities' => $this->knownValues('city'),
-            'regions' => $this->knownValues('region'),
+            'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
         ]);
@@ -132,6 +132,9 @@ class MarketController extends Controller implements HasMiddleware
         if ($result['skipped'] > 0) {
             $message .= " Skipped {$result['skipped']} row".($result['skipped'] === 1 ? '' : 's')." missing a name.";
         }
+        if ($result['region_unmatched'] > 0) {
+            $message .= " {$result['region_unmatched']} row".($result['region_unmatched'] === 1 ? '' : 's')." had a region that didn't match the controlled list -- imported without one, set it by hand on that market's Edit page.";
+        }
 
         return redirect()->route('admin.market.index')->with('success', $message);
     }
@@ -141,7 +144,7 @@ class MarketController extends Controller implements HasMiddleware
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
-            'region' => ['nullable', 'string', 'max:255'],
+            'region' => ['nullable', Rule::in(Market::REGIONS)],
             'market_type' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],

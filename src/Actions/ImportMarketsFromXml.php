@@ -25,7 +25,7 @@ use SimpleXMLElement;
 class ImportMarketsFromXml
 {
     /**
-     * @return array{created: int, updated: int, skipped: int}
+     * @return array{created: int, updated: int, skipped: int, region_unmatched: int}
      */
     public function handle(UploadedFile $file): array
     {
@@ -41,6 +41,7 @@ class ImportMarketsFromXml
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $regionUnmatched = 0;
 
         foreach ($xml->market as $node) {
             $name = $this->text($node, 'name');
@@ -57,9 +58,15 @@ class ImportMarketsFromXml
             $market = Market::where($matchOn)->first() ?? new Market($matchOn);
             $isNew = ! $market->exists;
 
+            $region = $this->region($node);
+            if ($region === false) {
+                $regionUnmatched++;
+                $region = null;
+            }
+
             $market->fill([
                 ...$matchOn,
-                'region' => $this->text($node, 'region'),
+                'region' => $region,
                 'market_type' => $this->text($node, 'market_type'),
                 'address' => $this->text($node, 'address'),
                 'frequency' => $this->frequency($node),
@@ -81,7 +88,7 @@ class ImportMarketsFromXml
             $isNew ? $created++ : $updated++;
         }
 
-        return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped];
+        return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'region_unmatched' => $regionUnmatched];
     }
 
     /**
@@ -115,5 +122,35 @@ class ImportMarketsFromXml
         }
 
         return array_key_exists($value, Market::FREQUENCIES) ? $value : 'other';
+    }
+
+    /**
+     * Region is a controlled list (Market::REGIONS), not free text -- unlike
+     * frequency there's no "other" bucket to fall back to (no matching
+     * detail field to carry the original text alongside it either), so a
+     * value that doesn't match is left unset rather than guessed at, and
+     * reported back as region_unmatched so it's visible and someone can
+     * pick the right one by hand on that market's Edit page. Matched
+     * case-insensitively (and normalized to REGIONS' own casing) since a
+     * manually-gathered XML source is more likely to have "okanagan" or
+     * "OKANAGAN" than to always match the canonical casing exactly.
+     *
+     * @return string|null|false string on a match, null if no region was
+     *   given at all, false if one was given but didn't match anything.
+     */
+    private function region(SimpleXMLElement $node): string|null|false
+    {
+        $value = $this->text($node, 'region');
+        if ($value === null) {
+            return null;
+        }
+
+        foreach (Market::REGIONS as $region) {
+            if (strcasecmp($region, $value) === 0) {
+                return $region;
+            }
+        }
+
+        return false;
     }
 }
