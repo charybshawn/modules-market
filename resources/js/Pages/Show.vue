@@ -53,7 +53,15 @@
               </button>
               <span class="inline-flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
                 <span v-if="market.liveness_score !== null" class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(market.liveness_score)"></span>
-                <InlineField label="Liveness Score" type="select" :model-value="market.liveness_score" :options="livenessOptions" placeholder="Liveness not checked" :on-save="(v) => saveField('liveness_score', v)" />
+                <InlineField
+                  label="Liveness Score"
+                  type="select"
+                  :model-value="market.liveness_score"
+                  :display-value="market.liveness_score !== null ? `${market.liveness_score}/4 · ${livenessLabel(market.liveness_score)}` : null"
+                  :options="livenessOptions"
+                  placeholder="Liveness not checked"
+                  :on-save="(v) => saveField('liveness_score', v)"
+                />
               </span>
               <span v-if="market.liveness_score !== null" class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500">
                 · checked
@@ -333,7 +341,13 @@ const saveField = (field: string, value: string | number | null): Promise<void> 
       {
         preserveScroll: true,
         preserveState: true,
-        onSuccess: () => resolve(),
+        onSuccess: () => {
+          // preserveState keeps the page mounted, so nothing else re-triggers
+          // the History feed's own fetch -- without this it would keep
+          // showing whatever it last loaded, one save behind.
+          feed.reload()
+          resolve()
+        },
         onError: (errors) => reject(new Error(String(Object.values(errors)[0] ?? 'Could not save.'))),
       },
     )
