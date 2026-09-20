@@ -10,12 +10,12 @@
          padding (AdminMobileHeader's px-4, the form's p-6) is what
          provides breathing room, not an outer margin. -->
     <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-      <AdminMobileHeader title="Edit Market" :href="route('admin.market.index')" />
+      <AdminMobileHeader title="Edit Market" :href="route('admin.market.show', props.market.id)" />
 
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
         <div class="hidden md:flex p-6 border-b border-gray-200 dark:border-gray-700 justify-between items-center">
           <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Edit Market</h1>
-          <Link :href="route('admin.market.index')" class="tap-target-touch inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">&larr; Back</Link>
+          <Link :href="route('admin.market.show', props.market.id)" class="tap-target-touch inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">&larr; Back</Link>
         </div>
 
         <form @submit.prevent="submit" class="p-6 space-y-8">
@@ -174,7 +174,7 @@
           <div class="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
             <button type="button" @click="destroy" class="tap-target-touch px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Delete Market</button>
             <div class="flex items-center">
-              <Link :href="route('admin.market.index')" class="tap-target-touch bg-gray-200 dark:bg-gray-700 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600">Cancel</Link>
+              <Link :href="route('admin.market.show', props.market.id)" class="tap-target-touch bg-gray-200 dark:bg-gray-700 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600">Cancel</Link>
               <button type="submit" :disabled="form.processing" class="tap-target-touch ml-3 bg-indigo-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
                 <span v-if="form.processing">Saving...</span>
                 <span v-else>Save</span>

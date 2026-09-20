@@ -102,7 +102,7 @@
           empty-action-label="Add your first market"
           :empty-action-href="route('admin.market.create')"
           mobile-row-style="line"
-          :row-href="(item) => route('admin.market.edit', item.id)"
+          :row-href="(item) => route('admin.market.show', item.id)"
         >
           <template #mobile-card="{ item }">
             <div class="flex items-center gap-3 min-w-0">

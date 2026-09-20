@@ -87,6 +87,17 @@ class MarketController extends Controller implements HasMiddleware
             ->with('success', "Market '{$market->name}' created.");
     }
 
+    public function show(Market $market): Response
+    {
+        $this->authorize('view', $market);
+
+        return Inertia::render('Vendor/market/Show', [
+            'market' => $market->load('schedules'),
+            'frequencies' => Market::FREQUENCIES,
+            'livenessLabels' => Market::LIVENESS_LABELS,
+        ]);
+    }
+
     public function edit(Market $market): Response
     {
         $this->authorize('update', $market);
@@ -113,7 +124,7 @@ class MarketController extends Controller implements HasMiddleware
         });
 
         return redirect()
-            ->route('admin.market.index')
+            ->route('admin.market.show', $market)
             ->with('success', "Market '{$market->name}' updated.");
     }
 

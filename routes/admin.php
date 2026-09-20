@@ -17,6 +17,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'admin'])->gr
         Route::post('/', [MarketController::class, 'store'])->name('store');
         Route::post('import', [MarketController::class, 'import'])->name('import');
         Route::get('{market}/edit', [MarketController::class, 'edit'])->name('edit');
+        Route::get('{market}', [MarketController::class, 'show'])->name('show');
         Route::put('{market}', [MarketController::class, 'update'])->name('update');
         Route::delete('{market}', [MarketController::class, 'destroy'])->name('destroy');
     });
