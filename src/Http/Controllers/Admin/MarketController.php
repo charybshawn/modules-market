@@ -9,6 +9,7 @@ use Cultpantry\Market\Contracts\MarketHistory;
 use Cultpantry\Market\Events\MarketRecordDeleted;
 use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
+use Cultpantry\Market\Models\MarketSchedule;
 use Cultpantry\Market\Support\MarketEventPresenter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -222,6 +223,40 @@ class MarketController extends Controller implements HasMiddleware
         return redirect()->route('admin.market.show', $market);
     }
 
+    /**
+     * Saves one schedule in place -- the click-to-edit counterpart to
+     * updateField() above, for the market Show page's schedule rows (a
+     * modal on desktop, a full-screen takeover on mobile, both driven by
+     * the same endpoint). Unlike syncSchedules()'s replace-all, this only
+     * ever touches the one row: no add/remove here, since those still only
+     * make sense on the full Edit form where the whole list is in view at
+     * once.
+     */
+    public function updateSchedule(Request $request, Market $market, MarketSchedule $schedule): RedirectResponse
+    {
+        $this->authorize('update', $market);
+        abort_unless($schedule->market_id === $market->id, 404);
+
+        $validated = $request->validate($this->scheduleFieldRules(), [], [
+            'liveness_score' => 'liveness score',
+            'liveness_checked_at' => 'checked-on date',
+        ]);
+
+        $before = $market->getAttributes();
+        $schedulesBefore = $market->scheduleSnapshot();
+
+        $schedule->update($validated);
+
+        // Same as update()/updateField(): nothing changed is nothing worth
+        // an audit row, even though the schedule row itself was "saved".
+        $event = MarketRecordSaved::forUpdated($market, $before, $schedulesBefore, auth()->id());
+        if ($event->changes !== []) {
+            event($event);
+        }
+
+        return redirect()->route('admin.market.show', $market)->with('success', 'Schedule updated.');
+    }
+
     public function destroy(Market $market): RedirectResponse
     {
         $this->authorize('delete', $market);
@@ -311,22 +346,39 @@ class MarketController extends Controller implements HasMiddleware
 
     private function validated(Request $request, ?int $ignoreId = null): array
     {
+        $scheduleRules = collect($this->scheduleFieldRules())
+            ->mapWithKeys(fn (array $rules, string $field) => ["schedules.*.{$field}" => $rules])
+            ->all();
+
         return $request->validate([
             ...$this->fieldRules(),
             'schedules' => ['nullable', 'array'],
-            'schedules.*.label' => ['nullable', 'string', 'max:255'],
-            'schedules.*.frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
-            'schedules.*.frequency_detail' => ['nullable', 'string'],
-            'schedules.*.start_date' => ['nullable', 'date'],
-            'schedules.*.end_date' => ['nullable', 'date'],
-            'schedules.*.address_line1' => ['nullable', 'string', 'max:255'],
-            'schedules.*.notes' => ['nullable', 'string'],
-            'schedules.*.liveness_score' => ['required', 'integer', 'min:0', 'max:4'],
-            'schedules.*.liveness_checked_at' => ['nullable', 'date'],
+            ...$scheduleRules,
         ], [], [
             'schedules.*.liveness_score' => 'liveness score',
             'schedules.*.liveness_checked_at' => 'checked-on date',
         ]);
+    }
+
+    /**
+     * One rule set per schedule field, shared by the full-form save
+     * (validated(), above, prefixed to schedules.*.<field>) and
+     * updateSchedule()'s single-row save -- same reasoning as fieldRules()
+     * for the market's own fields.
+     */
+    private function scheduleFieldRules(): array
+    {
+        return [
+            'label' => ['nullable', 'string', 'max:255'],
+            'frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
+            'frequency_detail' => ['nullable', 'string'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date'],
+            'address_line1' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+            'liveness_score' => ['required', 'integer', 'min:0', 'max:4'],
+            'liveness_checked_at' => ['nullable', 'date'],
+        ];
     }
 
     /**

@@ -21,6 +21,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'admin'])->gr
         Route::get('{market}', [MarketController::class, 'show'])->name('show');
         Route::put('{market}', [MarketController::class, 'update'])->name('update');
         Route::patch('{market}/field', [MarketController::class, 'updateField'])->name('update-field');
+        Route::patch('{market}/schedules/{schedule}', [MarketController::class, 'updateSchedule'])->name('schedules.update');
         Route::delete('{market}', [MarketController::class, 'destroy'])->name('destroy');
     });
 });

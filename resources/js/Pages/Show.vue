@@ -96,27 +96,33 @@
         <div class="p-6 space-y-8">
           <section>
             <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Schedules</h2>
-            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Adding, removing or changing a schedule happens on the Edit page, not inline here.</p>
+            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Tap a schedule to edit it. Adding or removing one still happens on the Edit page.</p>
             <p v-if="market.schedules.length === 0" class="mt-3 text-sm text-gray-500 dark:text-gray-400">No schedules yet.</p>
             <ul v-else class="mt-3 divide-y divide-gray-200 dark:divide-gray-700 rounded-md border border-gray-200 dark:border-gray-700">
-              <li v-for="schedule in market.schedules" :key="schedule.id" class="flex items-start justify-between gap-4 px-4 py-3">
-                <div class="min-w-0 space-y-0.5">
-                  <div class="text-sm font-medium text-gray-900 dark:text-white">
-                    {{ schedule.label ?? 'Schedule' }}
-                    <span v-if="schedule.frequency" class="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{{ frequencyLabel(schedule.frequency) }}</span>
-                  </div>
-                  <div v-if="schedule.frequency_detail" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ schedule.frequency_detail }}</div>
-                  <div v-if="dateRange(schedule)" class="text-sm text-gray-500 dark:text-gray-400">{{ dateRange(schedule) }}</div>
-                  <div v-if="schedule.address_line1" class="text-sm text-gray-500 dark:text-gray-400">At {{ schedule.address_line1 }}</div>
-                  <div v-if="schedule.notes" class="text-xs text-gray-400 dark:text-gray-500 whitespace-pre-line">{{ schedule.notes }}</div>
-                </div>
-                <span
-                  class="shrink-0 inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300"
-                  :title="`${livenessLabel(schedule.liveness_score)} · checked ${formatDate(schedule.liveness_checked_at)}`"
+              <li v-for="schedule in market.schedules" :key="schedule.id">
+                <button
+                  type="button"
+                  class="tap-target-touch flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  @click="editingSchedule = schedule"
                 >
-                  <span class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(schedule.liveness_score)"></span>
-                  {{ schedule.liveness_score }}/4
-                </span>
+                  <div class="min-w-0 space-y-0.5">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">
+                      {{ schedule.label ?? 'Schedule' }}
+                      <span v-if="schedule.frequency" class="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{{ frequencyLabel(schedule.frequency) }}</span>
+                    </div>
+                    <div v-if="schedule.frequency_detail" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ schedule.frequency_detail }}</div>
+                    <div v-if="dateRange(schedule)" class="text-sm text-gray-500 dark:text-gray-400">{{ dateRange(schedule) }}</div>
+                    <div v-if="schedule.address_line1" class="text-sm text-gray-500 dark:text-gray-400">At {{ schedule.address_line1 }}</div>
+                    <div v-if="schedule.notes" class="text-xs text-gray-400 dark:text-gray-500 whitespace-pre-line">{{ schedule.notes }}</div>
+                  </div>
+                  <span
+                    class="shrink-0 inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300"
+                    :title="`${livenessLabel(schedule.liveness_score)} · checked ${formatDate(schedule.liveness_checked_at)}`"
+                  >
+                    <span class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(schedule.liveness_score)"></span>
+                    {{ schedule.liveness_score }}/4
+                  </span>
+                </button>
               </li>
             </ul>
           </section>
@@ -219,6 +225,16 @@
     </div>
 
     <MarketEventsDrawer v-if="feed.config.enabled" :feed="feed" />
+
+    <ScheduleEditModal
+      :market-id="market.id"
+      :market-name="market.name"
+      :schedule="editingSchedule"
+      :frequencies="props.frequencies"
+      :liveness-labels="props.livenessLabels"
+      @close="editingSchedule = null"
+      @saved="handleScheduleSaved"
+    />
   </div>
 </template>
 
@@ -231,6 +247,7 @@ import InlineField from './Partials/InlineField.vue'
 import MarketEventFilters from './Partials/MarketEventFilters.vue'
 import MarketEventList from './Partials/MarketEventList.vue'
 import MarketEventsDrawer from './Partials/MarketEventsDrawer.vue'
+import ScheduleEditModal from './Partials/ScheduleEditModal.vue'
 import { useMarketEvents, type HistoryConfig } from './Partials/useMarketEvents'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: true }, () => page) })
@@ -358,6 +375,18 @@ const saveField = (field: string, value: string | number | boolean | null): Prom
       },
     )
   })
+}
+
+// The schedule currently open in ScheduleEditModal -- null closes it. Set
+// from the clicked row's own object rather than looking it up again, since
+// market.schedules already has it.
+const editingSchedule = ref<ScheduleDetail | null>(null)
+
+const handleScheduleSaved = () => {
+  editingSchedule.value = null
+  // Same reason as saveField's own feed.reload(): preserveState keeps the
+  // page mounted, so nothing else re-triggers the History feed's fetch.
+  feed.reload()
 }
 
 const togglingActive = ref(false)
