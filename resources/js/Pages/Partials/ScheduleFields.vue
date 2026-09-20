@@ -75,7 +75,7 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Liveness Score *</label>
           <select v-model="schedule.liveness_score" required :class="inputClass">
-            <option :value="null" disabled>Select…</option>
+            <option value="" disabled>Select…</option>
             <option v-for="(label, score) in livenessLabels" :key="score" :value="Number(score)">{{ score }}/4 &middot; {{ label }}</option>
           </select>
           <p v-if="errors[`schedules.${index}.liveness_score`]" class="mt-1 text-sm text-red-600 dark:text-red-400">{{ errors[`schedules.${index}.liveness_score`] }}</p>
@@ -98,7 +98,9 @@ export interface ScheduleForm {
   end_date: string
   address_line1: string
   notes: string
-  liveness_score: number | null
+  // '' (not null) while unset: a required <select> only reports
+  // valueMissing when its selected option's value is the empty string.
+  liveness_score: number | ''
   liveness_checked_at: string
 }
 
@@ -123,7 +125,7 @@ const addSchedule = () => {
       end_date: '',
       address_line1: '',
       notes: '',
-      liveness_score: null,
+      liveness_score: '',
       liveness_checked_at: new Date().toISOString().slice(0, 10),
     },
   ]

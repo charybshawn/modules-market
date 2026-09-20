@@ -197,6 +197,9 @@ class MarketController extends Controller implements HasMiddleware
             'schedules.*.notes' => ['nullable', 'string'],
             'schedules.*.liveness_score' => ['required', 'integer', 'min:0', 'max:4'],
             'schedules.*.liveness_checked_at' => ['nullable', 'date'],
+        ], [], [
+            'schedules.*.liveness_score' => 'liveness score',
+            'schedules.*.liveness_checked_at' => 'checked-on date',
         ]);
     }
 
