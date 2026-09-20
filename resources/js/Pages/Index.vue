@@ -95,6 +95,9 @@
           :columns="columns"
           :items="rows"
           :initial-filters="{ status: ['active'] }"
+          filter-grid-class="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+          :extra-filter-count="customFilterCount"
+          @clear-filters="clearCustomFilters"
           table-id="market-markets"
           item-key="id"
           searchable
@@ -136,99 +139,37 @@
                 v-if="showMoreFilters"
                 class="absolute -left-6 top-full z-30 mt-2 w-screen max-w-md max-h-[75vh] overflow-y-auto space-y-5 rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:left-0 sm:w-[30rem] sm:max-w-none dark:border-gray-600 dark:bg-gray-800"
               >
-            <div>
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Frequency</h3>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <button
-                  v-for="(label, key) in props.frequencies"
-                  :key="key"
-                  type="button"
-                  :aria-pressed="!!freqStates[key]"
-                  :class="[chipBase, chipClass(freqStates[key])]"
-                  @click="cycleFrequency(String(key))"
-                >{{ freqStates[key] === 'exclude' ? 'Not ' : '' }}{{ label }}</button>
-              </div>
-              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Click once to include, again to exclude, a third time to clear.</p>
-            </div>
-
-            <div>
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Occurring in</h3>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <button
-                  v-for="(name, i) in MONTHS"
-                  :key="name"
-                  type="button"
-                  :aria-pressed="months.includes(i + 1)"
-                  :class="[chipBase, chipClass(months.includes(i + 1) ? 'include' : undefined)]"
-                  @click="toggleMonth(i + 1)"
-                >{{ name }}</button>
-              </div>
-              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Any year, so last year's edition counts for next year. Schedules without dates never match a month.</p>
-            </div>
-
-            <div v-if="includeFreqs.length && months.length" class="flex flex-wrap items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
-              <span>Show schedules that match</span>
-              <span class="inline-flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-600">
-                <button
-                  v-for="mode in ['all', 'any'] as const"
-                  :key="mode"
-                  type="button"
-                  :aria-pressed="matchMode === mode"
-                  class="px-3 py-1 text-sm"
-                  :class="matchMode === mode ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300'"
-                  @click="matchMode = mode"
-                >{{ mode === 'all' ? 'both filters' : 'either filter' }}</button>
-              </span>
-            </div>
-
-            <div>
-              <div class="flex items-baseline justify-between">
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Liveness</h3>
-                <span class="text-sm text-gray-700 dark:text-gray-300">{{ livenessMin }}/4 &ndash; {{ livenessMax }}/4</span>
-              </div>
-              <div class="relative mt-2 h-6">
-                <div class="absolute inset-x-[9px] top-1/2 h-1 -translate-y-1/2 rounded-full bg-gray-200 dark:bg-gray-600">
-                  <div
-                    class="absolute h-1 rounded-full bg-indigo-500"
-                    :style="{ left: `${livenessMin * 25}%`, width: `${(livenessMax - livenessMin) * 25}%` }"
-                  ></div>
-                </div>
-                <input
-                  type="range" min="0" max="4" step="1"
-                  :value="livenessMin"
-                  aria-label="Minimum liveness score"
-                  class="liveness-range absolute inset-0 w-full"
-                  :style="{ zIndex: livenessMin === livenessMax && livenessMax >= 3 ? 5 : 3 }"
-                  @input="setLivenessMin($event)"
-                />
-                <input
-                  type="range" min="0" max="4" step="1"
-                  :value="livenessMax"
-                  aria-label="Maximum liveness score"
-                  class="liveness-range absolute inset-0 w-full"
-                  style="z-index: 4"
-                  @input="setLivenessMax($event)"
+                <ScheduleLiveFilters
+                  v-model:freq-states="freqStates"
+                  v-model:months="months"
+                  v-model:match-mode="matchMode"
+                  v-model:liveness-min="livenessMin"
+                  v-model:liveness-max="livenessMax"
+                  v-model:include-unchecked="includeUnchecked"
+                  :frequencies="props.frequencies"
+                  :custom-filter-count="customFilterCount"
+                  @clear="clearCustomFilters"
                 />
               </div>
-              <div class="mt-0.5 flex justify-between px-1 text-xs text-gray-400 dark:text-gray-500">
-                <span v-for="n in 5" :key="n">{{ n - 1 }}</span>
-              </div>
-              <label v-if="livenessFilterActive" class="tap-target-touch mt-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input v-model="includeUnchecked" type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700" />
-                Also show markets that haven't been checked
-              </label>
-              <p v-if="livenessFilterActive && livenessMin <= 1" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                Markets scoring 1 or below are marked inactive &mdash; also tick Inactive under Filters to see them.
-              </p>
             </div>
+          </template>
 
-            <button
-              v-if="customFilterCount"
-              type="button"
-              class="tap-target-touch text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
-              @click="clearCustomFilters"
-            >Clear these filters</button>
-              </div>
+          <!-- The same controls inside DataTable's own Filters dropdown, so
+               nothing lives outside it; the toolbar popover above is a
+               shortcut to the same state. -->
+          <template #filters-extra>
+            <div class="border-t border-gray-200 pt-4 dark:border-gray-600">
+              <ScheduleLiveFilters
+                v-model:freq-states="freqStates"
+                v-model:months="months"
+                v-model:match-mode="matchMode"
+                v-model:liveness-min="livenessMin"
+                v-model:liveness-max="livenessMax"
+                v-model:include-unchecked="includeUnchecked"
+                :frequencies="props.frequencies"
+                :custom-filter-count="customFilterCount"
+                @clear="clearCustomFilters"
+              />
             </div>
           </template>
 
@@ -300,6 +241,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
 import DataTable, { type Column } from '@/Components/Admin/DataTable.vue'
 import FormErrorSummary from '@/Components/Admin/FormErrorSummary.vue'
+import ScheduleLiveFilters from './Partials/ScheduleLiveFilters.vue'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
 
@@ -375,7 +317,6 @@ const livenessDotClass = (score: number) => {
 // "Active" via :initial-filters, and stays reachable as a filter chip rather
 // than a separate page -- tick Inactive as well, or clear it to see everything.
 // ---- Custom filters (schedule frequency, month, liveness range) ----
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const showMoreFilters = ref(false)
 const customFiltersRoot = ref<HTMLElement | null>(null)
@@ -401,29 +342,6 @@ const customFilterCount = computed(() =>
   (includeFreqs.value.length || excludeFreqs.value.length ? 1 : 0) + (months.value.length ? 1 : 0) + (livenessFilterActive.value ? 1 : 0),
 )
 
-const cycleFrequency = (key: string) => {
-  const next = { ...freqStates.value }
-  if (!next[key]) next[key] = 'include'
-  else if (next[key] === 'include') next[key] = 'exclude'
-  else delete next[key]
-  freqStates.value = next
-}
-const toggleMonth = (month: number) => {
-  months.value = months.value.includes(month) ? months.value.filter((m) => m !== month) : [...months.value, month]
-}
-// Thumbs can't cross; the DOM value is reset too, because when the clamp lands
-// on the model's old value Vue sees no change and would leave the thumb
-// wherever it was dragged.
-const setLivenessMin = (event: Event) => {
-  const input = event.target as HTMLInputElement
-  livenessMin.value = Math.min(input.valueAsNumber, livenessMax.value)
-  input.value = String(livenessMin.value)
-}
-const setLivenessMax = (event: Event) => {
-  const input = event.target as HTMLInputElement
-  livenessMax.value = Math.max(input.valueAsNumber, livenessMin.value)
-  input.value = String(livenessMax.value)
-}
 const clearCustomFilters = () => {
   freqStates.value = {}
   months.value = []
@@ -431,13 +349,6 @@ const clearCustomFilters = () => {
   livenessMin.value = 0
   livenessMax.value = 4
   includeUnchecked.value = false
-}
-
-const chipBase = 'tap-target-touch inline-flex items-center rounded-full border px-3 py-1 text-sm'
-const chipClass = (state: 'include' | 'exclude' | undefined) => {
-  if (state === 'include') return 'border-indigo-600 bg-indigo-600 text-white'
-  if (state === 'exclude') return 'border-red-500 bg-red-50 text-red-700 line-through dark:bg-red-900/20 dark:text-red-300'
-  return 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300'
 }
 
 // Every calendar month a schedule touches, ignoring the year: a 2023 edition
@@ -555,49 +466,3 @@ const handleFileChange = (event: Event) => {
   })
 }
 </script>
-
-<style scoped>
-/* Two overlaid range inputs make one two-thumb slider: the inputs themselves
-   ignore the pointer so the top one doesn't block the other, and only the
-   thumbs take clicks. */
-.liveness-range {
-  pointer-events: none;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  height: 1.5rem;
-  margin: 0;
-}
-.liveness-range::-webkit-slider-runnable-track {
-  background: transparent;
-}
-.liveness-range::-moz-range-track {
-  background: transparent;
-}
-.liveness-range::-webkit-slider-thumb {
-  pointer-events: auto;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 18px;
-  width: 18px;
-  border-radius: 9999px;
-  background: #4f46e5;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px #4f46e5;
-  cursor: pointer;
-}
-.liveness-range::-moz-range-thumb {
-  pointer-events: auto;
-  height: 14px;
-  width: 14px;
-  border-radius: 9999px;
-  background: #4f46e5;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px #4f46e5;
-  cursor: pointer;
-}
-.liveness-range:focus-visible::-webkit-slider-thumb {
-  outline: 2px solid #818cf8;
-  outline-offset: 2px;
-}
-</style>
