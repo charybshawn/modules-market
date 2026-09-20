@@ -80,7 +80,7 @@ class Market extends Model
     /**
      * How confident a liveness check is that a market is still actually
      * running -- see the find-bc-markets skill's scoring rubric
-     * (.claude/skills/find-bc-markets/SKILL.md in modules-costing) for how
+     * (.claude/skills/find-bc-markets/SKILL.md in this repo) for how
      * this gets computed during research. A plain 0-4 integer in the
      * database (not this labeled form) so it stays easy to sort/filter on;
      * these labels are for display only.
