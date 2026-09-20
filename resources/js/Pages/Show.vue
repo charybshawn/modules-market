@@ -40,7 +40,13 @@
               <InlineField label="Sponsor" :model-value="market.sponsor" placeholder="Add a sponsor" :on-save="(v) => saveField('sponsor', v)" />
             </p>
 
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <!-- flex-col on mobile: Active, the liveness score and the
+                 checked-on date are three separate tap targets that don't
+                 comfortably share one line at phone width -- wrapping mid-
+                 line (the sm:flex-row default) put "· checked" on its own
+                 half-empty row, which read as broken rather than just
+                 wrapped. Stacked, each gets its own full-width line. -->
+            <div class="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-3 gap-y-1 text-sm">
               <button
                 type="button"
                 class="tap-target-touch inline-flex items-center gap-1.5 font-medium disabled:opacity-50"
