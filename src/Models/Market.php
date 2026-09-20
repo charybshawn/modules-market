@@ -3,6 +3,7 @@
 namespace Cultpantry\Market\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -14,8 +15,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $address_line2
  * @property string|null $province
  * @property string|null $postal_code
- * @property string|null $frequency 'one_time'|'weekly'|'biweekly'|'monthly'|'seasonal'|'other'
- * @property string|null $frequency_detail
  * @property string|null $vendor_fees
  * @property string|null $phone
  * @property string|null $manager
@@ -36,7 +35,7 @@ class Market extends Model
     protected $table = 'market_markets';
 
     /**
-     * Bucket labels for the frequency select -- shared between the
+     * Bucket labels for a schedule's frequency select -- shared between the
      * controller's validation Rule::in and the Vue form's options list so
      * the two never drift apart (the controller exposes this array to the
      * frontend as a prop rather than the Vue side hardcoding its own copy).
@@ -103,8 +102,6 @@ class Market extends Model
         'address_line2',
         'province',
         'postal_code',
-        'frequency',
-        'frequency_detail',
         'vendor_fees',
         'phone',
         'manager',
@@ -126,4 +123,16 @@ class Market extends Model
         'liveness_score' => 'integer',
         'liveness_checked_at' => 'date',
     ];
+
+    /**
+     * Ordered by start_date (undated schedules last) so seasonal ones read
+     * chronologically wherever they're listed.
+     */
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(MarketSchedule::class)
+            ->orderByRaw('start_date is null')
+            ->orderBy('start_date')
+            ->orderBy('id');
+    }
 }

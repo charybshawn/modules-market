@@ -26,7 +26,7 @@ use SimpleXMLElement;
 class ImportMarketsFromXml
 {
     /**
-     * @return array{created: int, updated: int, skipped: int, region_unmatched: int}
+     * @return array{created: int, updated: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int}
      */
     public function handle(UploadedFile $file): array
     {
@@ -43,6 +43,8 @@ class ImportMarketsFromXml
         $updated = 0;
         $skipped = 0;
         $regionUnmatched = 0;
+        $scheduleCount = 0;
+        $schedulesSkipped = 0;
 
         foreach ($xml->market as $node) {
             $name = $this->text($node, 'name');
@@ -75,8 +77,6 @@ class ImportMarketsFromXml
                 'address_line2' => $this->text($node, 'address_line2'),
                 'province' => $this->text($node, 'province'),
                 'postal_code' => $this->text($node, 'postal_code'),
-                'frequency' => $this->frequency($node),
-                'frequency_detail' => $this->text($node, 'frequency_detail'),
                 'vendor_fees' => $this->text($node, 'vendor_fees'),
                 'phone' => $this->text($node, 'phone'),
                 'manager' => $this->text($node, 'manager'),
@@ -94,10 +94,80 @@ class ImportMarketsFromXml
 
             $market->save();
 
+            $schedules = $this->schedules($node, $schedulesSkipped);
+            if ($schedules !== []) {
+                // Replace-all, but only when the entry actually carried
+                // valid schedules -- a market re-imported without any
+                // shouldn't wipe schedules that were entered by hand.
+                $market->schedules()->delete();
+                $market->schedules()->createMany($schedules);
+                $scheduleCount += count($schedules);
+            }
+
             $isNew ? $created++ : $updated++;
         }
 
-        return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'region_unmatched' => $regionUnmatched];
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'region_unmatched' => $regionUnmatched,
+            'schedules' => $scheduleCount,
+            'schedules_skipped' => $schedulesSkipped,
+        ];
+    }
+
+    /**
+     * Parses <schedules><schedule>...</schedule></schedules>. A schedule
+     * without a valid 0-4 <liveness_score> is skipped (and counted), not
+     * imported with a guessed one -- the score is required per schedule so
+     * "is this specific schedule current?" is always an actual answer.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function schedules(SimpleXMLElement $node, int &$skipped): array
+    {
+        $schedules = [];
+
+        foreach ($node->schedules->schedule ?? [] as $schedule) {
+            $score = $this->livenessScore($schedule);
+            if ($score === null) {
+                $skipped++;
+                continue;
+            }
+
+            $schedules[] = [
+                'label' => $this->text($schedule, 'label'),
+                'frequency' => $this->frequency($schedule),
+                'frequency_detail' => $this->text($schedule, 'frequency_detail'),
+                'start_date' => $this->date($schedule, 'start_date'),
+                'end_date' => $this->date($schedule, 'end_date'),
+                'address_line1' => $this->text($schedule, 'address_line1'),
+                'notes' => $this->text($schedule, 'notes'),
+                'liveness_score' => $score,
+                'liveness_checked_at' => $this->livenessCheckedAt($schedule, $score),
+            ];
+        }
+
+        return $schedules;
+    }
+
+    /**
+     * An unparseable date is treated as absent rather than failing the row,
+     * same leniency as liveness_score above.
+     */
+    private function date(SimpleXMLElement $node, string $child): ?string
+    {
+        $value = $this->text($node, $child);
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**
@@ -119,7 +189,7 @@ class ImportMarketsFromXml
 
     /**
      * Falls back to 'other' for a value outside Market::FREQUENCIES rather
-     * than dropping it silently -- the row still imports, and
+     * than dropping it silently -- the schedule still imports, and
      * frequency_detail (free text) still carries whatever the source XML
      * actually said either way.
      */

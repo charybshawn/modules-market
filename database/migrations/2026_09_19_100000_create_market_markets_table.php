@@ -32,11 +32,8 @@ return new class extends Migration
             $table->string('address_line2')->nullable();
             $table->string('province')->nullable();
             $table->string('postal_code')->nullable();
-            // Small controlled set -- see MarketController::validated()'s
-            // Rule::in. frequency_detail (below) carries the free-text
-            // elaboration regardless of which bucket this is.
-            $table->string('frequency')->nullable();
-            $table->text('frequency_detail')->nullable();
+            // Frequency/hours live on market_schedules (one market can run
+            // several: summer, winter, one-off holiday events), not here.
             $table->text('vendor_fees')->nullable();
             // Market's own general/public line -- manager_phone below is
             // the manager's own direct line, a different number in
@@ -69,7 +66,6 @@ return new class extends Migration
             $table->index('city');
             $table->index('region');
             $table->index('market_type');
-            $table->index('frequency');
             $table->index('liveness_score');
         });
     }

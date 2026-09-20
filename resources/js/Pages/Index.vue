@@ -131,8 +131,12 @@
             <span class="text-sm text-gray-500 dark:text-gray-400">{{ item.market_type ?? '—' }}</span>
           </template>
 
-          <template #cell-frequency="{ item }">
-            <span class="text-sm text-gray-500 dark:text-gray-400">{{ item.frequency ? frequencyLabel(item.frequency) : '—' }}</span>
+          <template #cell-schedules="{ item }">
+            <div v-if="item.schedules.length" class="text-sm text-gray-500 dark:text-gray-400">
+              <div v-for="schedule in item.schedules.slice(0, 2)" :key="schedule.id" class="truncate">{{ scheduleSummary(schedule) }}</div>
+              <div v-if="item.schedules.length > 2" class="text-xs text-gray-400 dark:text-gray-500">+{{ item.schedules.length - 2 }} more</div>
+            </div>
+            <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
           </template>
 
           <template #cell-phone="{ item }">
@@ -166,13 +170,19 @@ import FormErrorSummary from '@/Components/Admin/FormErrorSummary.vue'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
 
+interface ScheduleRow {
+  id: number
+  label: string | null
+  frequency: string | null
+}
+
 interface MarketRow {
   id: number
   name: string
   city: string | null
   region: string | null
   market_type: string | null
-  frequency: string | null
+  schedules: ScheduleRow[]
   phone: string | null
   liveness_score: number | null
   liveness_checked_at: string | null
@@ -191,6 +201,8 @@ interface Props {
 const props = defineProps<Props>()
 
 const frequencyLabel = (value: string) => props.frequencies[value] ?? value
+const scheduleSummary = (schedule: ScheduleRow) =>
+  [schedule.label, schedule.frequency ? frequencyLabel(schedule.frequency) : null].filter(Boolean).join(' · ') || 'Schedule'
 const livenessLabel = (score: number) => props.livenessLabels[score] ?? 'Unknown'
 
 // Matches the skill's own scoring bands (see .claude/skills/find-bc-markets/
@@ -209,10 +221,7 @@ const columns = computed<Column[]>(() => [
   { key: 'city', label: 'City', sortable: true, filterable: true, options: props.cities },
   { key: 'region', label: 'Region', sortable: true, filterable: true, options: props.regions },
   { key: 'market_type', label: 'Type', hideable: true, filterable: true, options: props.marketTypes },
-  {
-    key: 'frequency', label: 'Frequency', hideable: true, filterable: true,
-    options: Object.entries(props.frequencies).map(([value, label]) => ({ value, label })),
-  },
+  { key: 'schedules', label: 'Schedules', hideable: true },
   { key: 'phone', label: 'Phone', hideable: true },
   {
     // No "Not checked" option here, deliberately -- DataTable's own

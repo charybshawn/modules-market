@@ -92,21 +92,8 @@
             </div>
           </div>
 
-          <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Schedule</h2>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Frequency</label>
-              <select v-model="form.frequency" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm">
-                <option :value="null">—</option>
-                <option v-for="(label, value) in props.frequencies" :key="value" :value="value">{{ label }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Frequency Detail</label>
-              <textarea v-model="form.frequency_detail" rows="2" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" placeholder="e.g. Saturdays 8:30am-12:30pm, May-October"></textarea>
-            </div>
+          <div class="pt-6 border-t border-gray-200 dark:border-gray-700">
+            <ScheduleFields v-model="form.schedules" :frequencies="props.frequencies" :liveness-labels="props.livenessLabels" :errors="form.errors" />
           </div>
 
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -208,6 +195,7 @@ import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
 import FormErrorSummary from '@/Components/Admin/FormErrorSummary.vue'
+import ScheduleFields, { type ScheduleForm } from './Partials/ScheduleFields.vue'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: true }, () => page) })
 
@@ -230,8 +218,6 @@ interface FormData {
   address_line2: string
   province: string
   postal_code: string
-  frequency: string | null
-  frequency_detail: string
   vendor_fees: string
   phone: string
   manager: string
@@ -246,6 +232,7 @@ interface FormData {
   liveness_score: number | null
   liveness_checked_at: string
   is_active: boolean
+  schedules: ScheduleForm[]
 }
 
 const form = useForm<FormData>({
@@ -259,8 +246,6 @@ const form = useForm<FormData>({
   // just saves re-typing it on every single market.
   province: 'BC',
   postal_code: '',
-  frequency: null,
-  frequency_detail: '',
   vendor_fees: '',
   phone: '',
   manager: '',
@@ -275,6 +260,7 @@ const form = useForm<FormData>({
   liveness_score: null,
   liveness_checked_at: '',
   is_active: true,
+  schedules: [],
 })
 
 const submit = () => {

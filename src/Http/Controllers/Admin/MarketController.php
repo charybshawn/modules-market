@@ -6,6 +6,8 @@ use App\Actions\GetSiteSetting;
 use App\Http\Controllers\Controller;
 use Cultpantry\Market\Actions\ImportMarketsFromXml;
 use Cultpantry\Market\Models\Market;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -42,7 +44,7 @@ class MarketController extends Controller implements HasMiddleware
     {
         $this->authorize('viewAny', Market::class);
 
-        $markets = Market::orderBy('name')->get();
+        $markets = Market::with('schedules')->orderBy('name')->get();
 
         return Inertia::render('Vendor/market/Index', [
             'markets' => $markets,
@@ -71,7 +73,14 @@ class MarketController extends Controller implements HasMiddleware
     {
         $this->authorize('create', Market::class);
 
-        $market = Market::create($this->validated($request));
+        $validated = $this->validated($request);
+
+        $market = DB::transaction(function () use ($validated) {
+            $market = Market::create(collect($validated)->except('schedules')->all());
+            $this->syncSchedules($market, $validated['schedules'] ?? []);
+
+            return $market;
+        });
 
         return redirect()
             ->route('admin.market.index')
@@ -83,7 +92,7 @@ class MarketController extends Controller implements HasMiddleware
         $this->authorize('update', $market);
 
         return Inertia::render('Vendor/market/Edit', [
-            'market' => $market,
+            'market' => $market->load('schedules'),
             'cities' => $this->knownValues('city'),
             'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
@@ -96,7 +105,12 @@ class MarketController extends Controller implements HasMiddleware
     {
         $this->authorize('update', $market);
 
-        $market->update($this->validated($request));
+        $validated = $this->validated($request);
+
+        DB::transaction(function () use ($market, $validated) {
+            $market->update(collect($validated)->except('schedules')->all());
+            $this->syncSchedules($market, $validated['schedules'] ?? []);
+        });
 
         return redirect()
             ->route('admin.market.index')
@@ -135,6 +149,12 @@ class MarketController extends Controller implements HasMiddleware
         if ($result['skipped'] > 0) {
             $message .= " Skipped {$result['skipped']} row".($result['skipped'] === 1 ? '' : 's')." missing a name.";
         }
+        if ($result['schedules'] > 0) {
+            $message .= " Imported {$result['schedules']} schedule".($result['schedules'] === 1 ? '' : 's').'.';
+        }
+        if ($result['schedules_skipped'] > 0) {
+            $message .= " Skipped {$result['schedules_skipped']} schedule".($result['schedules_skipped'] === 1 ? '' : 's')." missing a valid liveness score (0-4).";
+        }
         if ($result['region_unmatched'] > 0) {
             $message .= " {$result['region_unmatched']} row".($result['region_unmatched'] === 1 ? '' : 's')." had a region that didn't match the controlled list -- imported without one, set it by hand on that market's Edit page.";
         }
@@ -153,8 +173,6 @@ class MarketController extends Controller implements HasMiddleware
             'address_line2' => ['nullable', 'string', 'max:255'],
             'province' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:10'],
-            'frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
-            'frequency_detail' => ['nullable', 'string'],
             'vendor_fees' => ['nullable', 'string'],
             'phone' => ['nullable', 'string', 'max:50'],
             'manager' => ['nullable', 'string', 'max:255'],
@@ -169,7 +187,36 @@ class MarketController extends Controller implements HasMiddleware
             'liveness_score' => ['nullable', 'integer', 'min:0', 'max:4'],
             'liveness_checked_at' => ['nullable', 'date'],
             'is_active' => ['boolean'],
+            'schedules' => ['nullable', 'array'],
+            'schedules.*.label' => ['nullable', 'string', 'max:255'],
+            'schedules.*.frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
+            'schedules.*.frequency_detail' => ['nullable', 'string'],
+            'schedules.*.start_date' => ['nullable', 'date'],
+            'schedules.*.end_date' => ['nullable', 'date'],
+            'schedules.*.address_line1' => ['nullable', 'string', 'max:255'],
+            'schedules.*.notes' => ['nullable', 'string'],
+            'schedules.*.liveness_score' => ['required', 'integer', 'min:0', 'max:4'],
+            'schedules.*.liveness_checked_at' => ['nullable', 'date'],
         ]);
+    }
+
+    /**
+     * The schedules list is submitted whole with the market's own form (no
+     * per-schedule endpoints), so replace-all is the simplest correct sync:
+     * whatever rows came in are the market's schedules now.
+     *
+     * @param  array<int, array<string, mixed>>  $schedules
+     */
+    private function syncSchedules(Market $market, array $schedules): void
+    {
+        $market->schedules()->delete();
+
+        foreach ($schedules as $schedule) {
+            $market->schedules()->create([
+                ...$schedule,
+                'liveness_checked_at' => $schedule['liveness_checked_at'] ?? Carbon::today(),
+            ]);
+        }
     }
 
     /**

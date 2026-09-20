@@ -5,7 +5,8 @@
     "publish_tag": "market-pages",
     "provider": "Cultpantry\\Market\\MarketServiceProvider",
     "tables": [
-        "market_markets"
+        "market_markets",
+        "market_schedules"
     ],
     "table_prefix": "market_"
 }

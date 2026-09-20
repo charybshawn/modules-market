@@ -86,21 +86,8 @@
             </div>
           </div>
 
-          <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Schedule</h2>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Frequency</label>
-              <select v-model="form.frequency" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm">
-                <option :value="null">—</option>
-                <option v-for="(label, value) in props.frequencies" :key="value" :value="value">{{ label }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Frequency Detail</label>
-              <textarea v-model="form.frequency_detail" rows="2" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm"></textarea>
-            </div>
+          <div class="pt-6 border-t border-gray-200 dark:border-gray-700">
+            <ScheduleFields v-model="form.schedules" :frequencies="props.frequencies" :liveness-labels="props.livenessLabels" :errors="form.errors" />
           </div>
 
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -205,8 +192,21 @@ import { Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
 import FormErrorSummary from '@/Components/Admin/FormErrorSummary.vue'
+import ScheduleFields, { type ScheduleForm } from './Partials/ScheduleFields.vue'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: true }, () => page) })
+
+interface MarketScheduleDetail {
+  label: string | null
+  frequency: string | null
+  frequency_detail: string | null
+  start_date: string | null
+  end_date: string | null
+  address_line1: string | null
+  notes: string | null
+  liveness_score: number
+  liveness_checked_at: string
+}
 
 interface MarketDetail {
   id: number
@@ -218,8 +218,6 @@ interface MarketDetail {
   address_line2: string | null
   province: string | null
   postal_code: string | null
-  frequency: string | null
-  frequency_detail: string | null
   vendor_fees: string | null
   phone: string | null
   manager: string | null
@@ -234,6 +232,7 @@ interface MarketDetail {
   liveness_score: number | null
   liveness_checked_at: string | null
   is_active: boolean
+  schedules: MarketScheduleDetail[]
 }
 
 interface Props {
@@ -256,8 +255,6 @@ const form = useForm({
   address_line2: props.market.address_line2 ?? '',
   province: props.market.province ?? '',
   postal_code: props.market.postal_code ?? '',
-  frequency: props.market.frequency,
-  frequency_detail: props.market.frequency_detail ?? '',
   vendor_fees: props.market.vendor_fees ?? '',
   phone: props.market.phone ?? '',
   manager: props.market.manager ?? '',
@@ -276,6 +273,19 @@ const form = useForm({
   // safe regardless of whether the backend ever sends a bare date instead.
   liveness_checked_at: props.market.liveness_checked_at?.slice(0, 10) ?? '',
   is_active: props.market.is_active,
+  // Dates arrive as ISO datetimes (Eloquent date cast); <input type="date">
+  // needs plain YYYY-MM-DD, same slice as liveness_checked_at above.
+  schedules: props.market.schedules.map((s): ScheduleForm => ({
+    label: s.label ?? '',
+    frequency: s.frequency,
+    frequency_detail: s.frequency_detail ?? '',
+    start_date: s.start_date?.slice(0, 10) ?? '',
+    end_date: s.end_date?.slice(0, 10) ?? '',
+    address_line1: s.address_line1 ?? '',
+    notes: s.notes ?? '',
+    liveness_score: s.liveness_score,
+    liveness_checked_at: s.liveness_checked_at.slice(0, 10),
+  })),
 })
 
 const submit = () => {
