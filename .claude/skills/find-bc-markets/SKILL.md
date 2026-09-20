@@ -393,6 +393,13 @@ predictor of next year's.
   3; something last seen two or more years ago is a 2 with a note of what's
   still unchecked. A brand-new event has no past edition — say so; its
   repeat is the thing to watch.
+- **Past markets that look dead are still written when the user has asked
+  for past markets to be captured.** The default (step 6) is to leave a
+  brand-new likely-defunct market out, but for a user collecting past events
+  "in case they repeat", write it with its low score: a score of 1 or below
+  imports it as inactive, so it's on file but hidden unless someone includes
+  inactive markets. Say so in the market's notes and in the summary, so the
+  user can drop it from the XML if they'd rather not have it.
 - **Flag likely successors, don't merge them.** A new page at the same
   location as a silent old one (a "Community Market Events" page in the same
   postal code as a market that stopped posting in 2024) is worth a note on
