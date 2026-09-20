@@ -91,29 +91,51 @@
            DataTable's sticky toolbar, pinning it at a fixed offset inside
            this box instead of sticking to the viewport. -->
       <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
-        <!-- Filters DataTable's own chips can't express: schedule frequency
-             with exclusion ("not weekly"), months a schedule falls in, and a
-             liveness range. They narrow `rows` before DataTable sees them. -->
-        <div class="border-b border-gray-200 dark:border-gray-700">
-          <button
-            type="button"
-            class="tap-target-touch flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
-            :aria-expanded="showMoreFilters"
-            @click="showMoreFilters = !showMoreFilters"
-          >
-            <span class="inline-flex items-center gap-2">
-              Schedule &amp; liveness filters
-              <span
-                v-if="customFilterCount"
-                class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white"
-              >{{ customFilterCount }}</span>
-            </span>
-            <svg class="w-4 h-4 transition-transform" :class="showMoreFilters ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+        <DataTable
+          :columns="columns"
+          :items="rows"
+          :initial-filters="{ status: ['active'] }"
+          table-id="market-markets"
+          item-key="id"
+          searchable
+          search-placeholder="Search markets..."
+          :empty-message="customFilterCount ? 'No markets match these schedule or liveness filters.' : 'No markets yet.'"
+          :empty-action-label="customFilterCount ? '' : 'Add your first market'"
+          :empty-action-href="route('admin.market.create')"
+          mobile-row-style="line"
+          :row-href="(item) => route('admin.market.show', item.id)"
+        >
+          <!-- Filters DataTable's own chips can't express: schedule frequency
+               with exclusion ("not weekly"), months a schedule falls in, and a
+               liveness range. They narrow `rows` before DataTable sees them.
+               A toolbar button + popover, next to the built-in Filters button,
+               so it's found where filters are found. -->
+          <template #toolbar-extra>
+            <div ref="customFiltersRoot" class="relative" @keydown.esc="showMoreFilters = false">
+              <button
+                type="button"
+                aria-label="Schedule and liveness filters"
+                :aria-expanded="showMoreFilters"
+                class="tap-target-touch inline-flex items-center px-2.5 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="showMoreFilters = !showMoreFilters"
+              >
+                <svg class="w-4 h-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="hidden sm:inline">Schedule &amp; liveness</span>
+                <span
+                  v-if="customFilterCount"
+                  class="ml-1.5 inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-indigo-600 text-white text-[11px] font-semibold leading-none"
+                >{{ customFilterCount }}</span>
+                <svg class="w-4 h-4 ml-1 transition-transform" :class="{ 'rotate-180': showMoreFilters }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-          <div v-if="showMoreFilters" class="space-y-5 px-4 pb-5">
+              <div
+                v-if="showMoreFilters"
+                class="absolute -left-6 top-full z-30 mt-2 w-screen max-w-md max-h-[75vh] overflow-y-auto space-y-5 rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:left-0 sm:w-[30rem] sm:max-w-none dark:border-gray-600 dark:bg-gray-800"
+              >
             <div>
               <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Frequency</h3>
               <div class="mt-2 flex flex-wrap gap-2">
@@ -206,23 +228,10 @@
               class="tap-target-touch text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
               @click="clearCustomFilters"
             >Clear these filters</button>
-          </div>
-        </div>
+              </div>
+            </div>
+          </template>
 
-        <DataTable
-          :columns="columns"
-          :items="rows"
-          :initial-filters="{ status: ['active'] }"
-          table-id="market-markets"
-          item-key="id"
-          searchable
-          search-placeholder="Search markets..."
-          :empty-message="customFilterCount ? 'No markets match these schedule or liveness filters.' : 'No markets yet.'"
-          :empty-action-label="customFilterCount ? '' : 'Add your first market'"
-          :empty-action-href="route('admin.market.create')"
-          mobile-row-style="line"
-          :row-href="(item) => route('admin.market.show', item.id)"
-        >
           <template #mobile-card="{ item }">
             <div class="flex items-center gap-3 min-w-0">
               <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.name }}</span>
@@ -285,7 +294,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
@@ -369,6 +378,14 @@ const livenessDotClass = (score: number) => {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const showMoreFilters = ref(false)
+const customFiltersRoot = ref<HTMLElement | null>(null)
+const closeOnOutsideClick = (event: MouseEvent) => {
+  if (showMoreFilters.value && customFiltersRoot.value && !customFiltersRoot.value.contains(event.target as Node)) {
+    showMoreFilters.value = false
+  }
+}
+onMounted(() => document.addEventListener('mousedown', closeOnOutsideClick))
+onBeforeUnmount(() => document.removeEventListener('mousedown', closeOnOutsideClick))
 const freqStates = ref<Record<string, 'include' | 'exclude'>>({})
 const months = ref<number[]>([])
 const matchMode = ref<'all' | 'any'>('all')
