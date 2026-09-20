@@ -153,6 +153,27 @@ class Market extends Model
      * Ordered by start_date (undated schedules last) so seasonal ones read
      * chronologically wherever they're listed.
      */
+    /**
+     * A plain, comparable picture of this market's schedules (dates as
+     * Y-m-d), for the audit events' before/after diff.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function scheduleSnapshot(): array
+    {
+        return $this->schedules()->get()->map(fn (MarketSchedule $s) => [
+            'label' => $s->label,
+            'frequency' => $s->frequency,
+            'frequency_detail' => $s->frequency_detail,
+            'start_date' => $s->start_date?->toDateString(),
+            'end_date' => $s->end_date?->toDateString(),
+            'address_line1' => $s->address_line1,
+            'notes' => $s->notes,
+            'liveness_score' => $s->liveness_score,
+            'liveness_checked_at' => $s->liveness_checked_at?->toDateString(),
+        ])->all();
+    }
+
     public function schedules(): HasMany
     {
         return $this->hasMany(MarketSchedule::class)

@@ -2,6 +2,7 @@
 
 namespace Cultpantry\Market\Actions;
 
+use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -61,6 +62,8 @@ class ImportMarketsFromXml
 
             $market = Market::where($matchOn)->first() ?? new Market($matchOn);
             $isNew = ! $market->exists;
+            $before = $isNew ? [] : $market->getAttributes();
+            $schedulesBefore = $isNew ? [] : $market->scheduleSnapshot();
 
             $region = $this->region($node);
             if ($region === false) {
@@ -112,6 +115,13 @@ class ImportMarketsFromXml
                 $market->schedules()->delete();
                 $market->schedules()->createMany($schedules);
                 $scheduleCount += count($schedules);
+            }
+
+            $event = $isNew
+                ? MarketRecordSaved::forCreated($market, auth()->id(), ['source' => 'xml_import'])
+                : MarketRecordSaved::forUpdated($market, $before, $schedulesBefore, auth()->id(), ['source' => 'xml_import']);
+            if ($isNew || $event->changes !== []) {
+                event($event);
             }
 
             $isNew ? $created++ : $updated++;

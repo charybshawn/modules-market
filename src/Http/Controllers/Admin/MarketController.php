@@ -5,6 +5,8 @@ namespace Cultpantry\Market\Http\Controllers\Admin;
 use App\Actions\GetSiteSetting;
 use App\Http\Controllers\Controller;
 use Cultpantry\Market\Actions\ImportMarketsFromXml;
+use Cultpantry\Market\Events\MarketRecordDeleted;
+use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -82,6 +84,8 @@ class MarketController extends Controller implements HasMiddleware
             return $market;
         });
 
+        event(MarketRecordSaved::forCreated($market, auth()->id()));
+
         return redirect()
             ->route('admin.market.index')
             ->with('success', "Market '{$market->name}' created.");
@@ -117,11 +121,19 @@ class MarketController extends Controller implements HasMiddleware
         $this->authorize('update', $market);
 
         $validated = $this->validated($request);
+        $before = $market->getAttributes();
+        $schedulesBefore = $market->scheduleSnapshot();
 
         DB::transaction(function () use ($market, $validated) {
             $market->update(collect($validated)->except('schedules')->all());
             $this->syncSchedules($market, $validated['schedules'] ?? []);
         });
+
+        // Saving with nothing changed isn't worth an audit row.
+        $event = MarketRecordSaved::forUpdated($market, $before, $schedulesBefore, auth()->id());
+        if ($event->changes !== []) {
+            event($event);
+        }
 
         return redirect()
             ->route('admin.market.show', $market)
@@ -133,7 +145,9 @@ class MarketController extends Controller implements HasMiddleware
         $this->authorize('delete', $market);
 
         $name = $market->name;
+        $deletedEvent = MarketRecordDeleted::forModel($market, auth()->id());
         $market->delete();
+        event($deletedEvent);
 
         return redirect()
             ->route('admin.market.index')
