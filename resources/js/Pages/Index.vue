@@ -253,12 +253,12 @@
           <template #cell-schedules="{ item }">
             <div v-if="item.schedules.length" class="text-sm text-gray-500 dark:text-gray-400">
               <div
-                v-for="schedule in orderedSchedules(item).slice(0, 2)"
+                v-for="schedule in visibleSchedules(item)"
                 :key="schedule.id"
                 class="truncate"
                 :class="item.matched_schedule_ids.includes(schedule.id) ? 'font-medium text-gray-900 dark:text-white' : ''"
               >{{ scheduleSummary(schedule) }}</div>
-              <div v-if="item.schedules.length > 2" class="text-xs text-gray-400 dark:text-gray-500">+{{ item.schedules.length - 2 }} more</div>
+              <div v-if="item.schedules.length > visibleSchedules(item).length" class="text-xs text-gray-400 dark:text-gray-500">+{{ item.schedules.length - visibleSchedules(item).length }} more</div>
             </div>
             <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
           </template>
@@ -486,11 +486,13 @@ const rows = computed(() => {
   })
 })
 
-// Matching schedules first, so the reason a market matched is what you see.
-const orderedSchedules = (item: { schedules: ScheduleRow[]; matched_schedule_ids: number[] }) =>
+// With a schedule filter on, show every schedule that matched -- they're the
+// reason the market is in the list, so none may hide behind "+N more". With
+// none on, keep the compact first two.
+const visibleSchedules = (item: { schedules: ScheduleRow[]; matched_schedule_ids: number[] }) =>
   item.matched_schedule_ids.length
-    ? [...item.schedules].sort((a, b) => Number(item.matched_schedule_ids.includes(b.id)) - Number(item.matched_schedule_ids.includes(a.id)))
-    : item.schedules
+    ? item.schedules.filter((s) => item.matched_schedule_ids.includes(s.id))
+    : item.schedules.slice(0, 2)
 
 const columns = computed<Column[]>(() => [
   {
