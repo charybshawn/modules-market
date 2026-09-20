@@ -117,6 +117,17 @@ matters:
    guessing. Always record `sources` (the URL(s) the info came from) so the
    user can verify anything later.
 
+   **Don't copy a combined listing's dates onto each market.** A tourism page
+   that covers two co-located markets ("a double market experience") gives
+   one date range for the pair, and it's usually just one of them. Take each
+   market's dates from its *own* site or a per-market directory such as the BC
+   Farmers' Market Trail, and treat two markets that end up with identical
+   dates and near-identical hours as a red flag to re-check, not a result.
+   (Revelstoke's Farm & Craft Market was first given the Local Food
+   Initiative market's October 31 end date; its own directory listing says
+   October 10.) When sources disagree on a date, say so in `<notes>` and name
+   which one you used and why.
+
    **Name a sponsor when there is one.** When a market's name differs from the
    business or organization actually behind it — a night market hosted by a
    resort's restaurant, a Christmas market put on by a brewery — record that
