@@ -94,6 +94,7 @@
         <DataTable
           :columns="columns"
           :items="rows"
+          :initial-filters="{ status: ['active'] }"
           table-id="market-markets"
           item-key="id"
           searchable
@@ -135,14 +136,6 @@
                 v-if="showMoreFilters"
                 class="absolute -left-6 top-full z-30 mt-2 w-screen max-w-md max-h-[75vh] overflow-y-auto space-y-5 rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:left-0 sm:w-[30rem] sm:max-w-none dark:border-gray-600 dark:bg-gray-800"
               >
-            <div>
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Status</h3>
-              <label class="tap-target-touch mt-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input v-model="includeInactive" type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700" />
-                Include inactive markets<span v-if="inactiveCount" class="text-gray-400 dark:text-gray-500">({{ inactiveCount }})</span>
-              </label>
-            </div>
-
             <div>
               <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Frequency</h3>
               <div class="mt-2 flex flex-wrap gap-2">
@@ -225,7 +218,7 @@
                 Also show markets that haven't been checked
               </label>
               <p v-if="livenessFilterActive && livenessMin <= 1" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                Markets scoring 1 or below are marked inactive &mdash; tick &ldquo;Include inactive markets&rdquo; above to see them.
+                Markets scoring 1 or below are marked inactive &mdash; also tick Inactive under Filters to see them.
               </p>
             </div>
 
@@ -378,11 +371,9 @@ const livenessDotClass = (score: number) => {
 }
 
 // Inactive markets (including anything scored 1 or below, which the model
-// deactivates on save) are hidden by default; "Include inactive markets" in
-// the popover brings them back. It's a checkbox there rather than a Status
-// list in DataTable's Filters drawer because a fourth multiselect list wraps
-// that drawer's three-column grid onto a second, clipped row.
-
+// deactivates on save) are hidden by default: the Status filter starts on
+// "Active" via :initial-filters, and stays reachable as a filter chip rather
+// than a separate page -- tick Inactive as well, or clear it to see everything.
 // ---- Custom filters (schedule frequency, month, liveness range) ----
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -401,15 +392,13 @@ const matchMode = ref<'all' | 'any'>('all')
 const livenessMin = ref(0)
 const livenessMax = ref(4)
 const includeUnchecked = ref(false)
-const includeInactive = ref(false)
-const inactiveCount = computed(() => props.markets.filter((m) => !m.is_active).length)
 
 const includeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'include').map(([k]) => k))
 const excludeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'exclude').map(([k]) => k))
 const livenessFilterActive = computed(() => livenessMin.value > 0 || livenessMax.value < 4)
 // One badge count per active group, matching how DataTable counts its chips.
 const customFilterCount = computed(() =>
-  (includeFreqs.value.length || excludeFreqs.value.length ? 1 : 0) + (months.value.length ? 1 : 0) + (livenessFilterActive.value ? 1 : 0) + (includeInactive.value ? 1 : 0),
+  (includeFreqs.value.length || excludeFreqs.value.length ? 1 : 0) + (months.value.length ? 1 : 0) + (livenessFilterActive.value ? 1 : 0),
 )
 
 const cycleFrequency = (key: string) => {
@@ -442,7 +431,6 @@ const clearCustomFilters = () => {
   livenessMin.value = 0
   livenessMax.value = 4
   includeUnchecked.value = false
-  includeInactive.value = false
 }
 
 const chipBase = 'tap-target-touch inline-flex items-center rounded-full border px-3 py-1 text-sm'
@@ -489,9 +477,11 @@ const scheduleMatches = (schedule: ScheduleRow): boolean => {
 }
 
 const rows = computed(() => {
-  let list = props.markets
-    .filter((m) => includeInactive.value || m.is_active)
-    .map((m) => ({ ...m, matched_schedule_ids: [] as number[] }))
+  let list = props.markets.map((m) => ({
+    ...m,
+    status: m.is_active ? 'active' : 'inactive',
+    matched_schedule_ids: [] as number[],
+  }))
 
   if (livenessFilterActive.value) {
     list = list.filter((m) =>
@@ -522,6 +512,10 @@ const visibleSchedules = (item: { schedules: ScheduleRow[]; matched_schedule_ids
     : item.schedules.slice(0, 2)
 
 const columns = computed<Column[]>(() => [
+  {
+    key: 'status', label: 'Status', filterable: true, filterType: 'multiselect', filterOnly: true,
+    options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+  },
   { key: 'name', label: 'Market', sortable: true },
   { key: 'city', label: 'City', sortable: true, filterable: true, filterType: 'multiselect', options: props.cities },
   { key: 'region', label: 'Region', sortable: true, filterable: true, filterType: 'multiselect', options: props.regions },
