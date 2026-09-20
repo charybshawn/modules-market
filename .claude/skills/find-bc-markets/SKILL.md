@@ -329,6 +329,57 @@ matters:
    yourself** — that's a deliberate step the user takes through the admin
    panel's Import XML button, reviewing the file first.
 
+## One-time, pop-up and past-event markets
+
+Recurring weekly markets are easy to find; the one-off ones — holiday markets,
+craft fairs, harvest and Halloween markets, street festivals — mostly live in
+event listings and community groups, and they repeat annually. Capture the
+past ones too (from 2023 on), because last year's Christmas market is the best
+predictor of next year's.
+
+- **Where to look.** Facebook's event search
+  (`facebook.com/events/search/?q=<town> market`) and the "suggested events"
+  sidebar on any event page; the *search* box of a **public** Facebook group
+  about local events (`.../groups/<id>/search/?q=market`); the pages of venues
+  that host markets (malls, wineries, farms, rec centres); the downtown
+  association's and organizers' own sites; local news, especially council
+  road-closure stories (they name exact dates); and regional roundup guides,
+  which are the best source for *past* editions. Instagram is worth opening
+  for an organizer's known account, not for hashtag browsing — hashtag pages
+  are images with no readable text.
+- **Groups are read-only, and only public ones.** Read a public group the way
+  any visitor could; never join, request access, or post. Private groups can't
+  be read, so just note their names in the summary for the user.
+- **Never accept a date without its year.** A Facebook event page's header
+  carries the year — use it. (An event that looked like it might be upcoming,
+  "Dec 7-8", turned out to be 2018.) If only a day and month are given and you
+  can't find the year, leave the schedule's dates out and say so.
+- **Open the source; don't trust a search summary.** Summaries in this
+  environment have merged two different businesses, and returned events in
+  Kelowna and Armstrong for a Salmon Arm search. Confirm the town and the name
+  on the actual page. Keep the import to the area the user asked for (the town
+  plus its immediate neighbours) and list nearby-but-outside finds in the
+  summary instead of importing them.
+- **How to model them.** A special day of an existing market (Apple Fest at
+  the weekly downtown market) is a `one_time` schedule *on that market* — and
+  since schedules are replaced wholesale on import, re-supply its existing
+  schedules unchanged. A standalone event is its own market with one
+  `one_time` schedule (`start_date` = `end_date` for a single day) for the
+  next or most recent edition; put earlier editions, with their years, in
+  `<notes>`. Say whether an event is borderline (a home show with a
+  marketplace, an agricultural fair) so the user can drop it.
+- **Scoring a one-time event** uses the same four checks, aimed at "is this
+  event real and does it recur?": an upcoming edition confirmed by two
+  *independent* sources, or one that already ran this year, is a 4; one
+  source (only the organizer's own page and event, which count as one) is a
+  3; something last seen two or more years ago is a 2 with a note of what's
+  still unchecked. A brand-new event has no past edition — say so; its
+  repeat is the thing to watch.
+- **Flag likely successors, don't merge them.** A new page at the same
+  location as a silent old one (a "Community Market Events" page in the same
+  postal code as a market that stopped posting in 2024) is worth a note on
+  both records, but only the user, or the organizer, can say they're the same.
+
 ## A note on scale
 
 This works best run per-city or per-region, the way a person would actually
