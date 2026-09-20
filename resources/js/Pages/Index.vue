@@ -155,6 +155,10 @@
             <span class="text-sm text-gray-500 dark:text-gray-400">{{ item.market_type ?? '—' }}</span>
           </template>
 
+          <template #cell-sponsor="{ item }">
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ item.sponsor ?? '—' }}</span>
+          </template>
+
           <template #cell-schedules="{ item }">
             <div v-if="item.schedules.length" class="text-sm text-gray-500 dark:text-gray-400">
               <div
@@ -214,6 +218,7 @@ interface MarketRow {
   city: string | null
   region: string | null
   market_type: string | null
+  sponsor: string | null
   schedules: ScheduleRow[]
   phone: string | null
   liveness_score: number | null
@@ -377,6 +382,7 @@ const columns = computed<Column[]>(() => [
   { key: 'city', label: 'City', sortable: true, filterable: true, filterType: 'multiselect', options: props.cities },
   { key: 'region', label: 'Region', sortable: true, filterable: true, filterType: 'multiselect', options: props.regions },
   { key: 'market_type', label: 'Type', hideable: true, filterable: true, filterType: 'multiselect', options: props.marketTypes },
+  { key: 'sponsor', label: 'Sponsor', sortable: true, hideable: true },
   { key: 'schedules', label: 'Schedules', hideable: true },
   { key: 'phone', label: 'Phone', hideable: true },
   // Filtered with the range slider in the panel above instead of a chip: a

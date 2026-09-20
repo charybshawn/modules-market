@@ -117,6 +117,13 @@ matters:
    guessing. Always record `sources` (the URL(s) the info came from) so the
    user can verify anything later.
 
+   **Name a sponsor when there is one.** When a market's name differs from the
+   business or organization actually behind it — a night market hosted by a
+   resort's restaurant, a Christmas market put on by a brewery — record that
+   business in `<sponsor>`. If the market is just run by its own
+   organization, or the sponsor is already in the name, leave it out rather
+   than repeating the name.
+
    **Split distinct schedules out.** When a market runs more than one
    distinct thing — a summer market and a winter market, a holiday fair at a
    different venue — write each as its own `<schedule>` rather than

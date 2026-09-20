@@ -55,6 +55,12 @@
               </datalist>
             </div>
 
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Sponsor</label>
+              <input v-model="form.sponsor" type="text" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The business or organization behind the market, when it isn't in the market's name.</p>
+            </div>
+
             <label class="tap-target-touch flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700" />
               Active
@@ -214,6 +220,7 @@ interface MarketDetail {
   city: string | null
   region: string | null
   market_type: string | null
+  sponsor: string | null
   address_line1: string | null
   address_line2: string | null
   province: string | null
@@ -251,6 +258,7 @@ const form = useForm({
   city: props.market.city ?? '',
   region: props.market.region,
   market_type: props.market.market_type ?? '',
+  sponsor: props.market.sponsor ?? '',
   address_line1: props.market.address_line1 ?? '',
   address_line2: props.market.address_line2 ?? '',
   province: props.market.province ?? '',

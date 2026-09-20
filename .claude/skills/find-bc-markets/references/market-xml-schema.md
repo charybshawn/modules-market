@@ -71,6 +71,7 @@ at a glance what you actually found versus didn't.
 | `city` | Free text. |
 | `region` | One of the controlled list above. |
 | `market_type` | Free text — "Farmers", "Artisan", "Makers", etc. |
+| `sponsor` | The business or organization behind the market, when that isn't already in its name — e.g. a night market at a resort, run by the resort's restaurant (`Finz Restaurant`). Leave it out when the market is simply run by its own organization. |
 | `address_line1` | Street address. |
 | `address_line2` | Unit/suite, if any. |
 | `province` | Almost always `BC`. |

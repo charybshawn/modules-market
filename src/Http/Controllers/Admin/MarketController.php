@@ -183,6 +183,7 @@ class MarketController extends Controller implements HasMiddleware
             'city' => ['nullable', 'string', 'max:255'],
             'region' => ['nullable', Rule::in(Market::REGIONS)],
             'market_type' => ['nullable', 'string', 'max:255'],
+            'sponsor' => ['nullable', 'string', 'max:255'],
             'address_line1' => ['nullable', 'string', 'max:255'],
             'address_line2' => ['nullable', 'string', 'max:255'],
             'province' => ['nullable', 'string', 'max:255'],

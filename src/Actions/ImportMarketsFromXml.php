@@ -74,6 +74,7 @@ class ImportMarketsFromXml
                 ...$matchOn,
                 'region' => $region,
                 'market_type' => $this->text($node, 'market_type'),
+                'sponsor' => $this->text($node, 'sponsor'),
                 'address_line1' => $this->text($node, 'address_line1'),
                 'address_line2' => $this->text($node, 'address_line2'),
                 'province' => $this->text($node, 'province'),

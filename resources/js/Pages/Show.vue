@@ -14,6 +14,7 @@
           <div class="min-w-0">
             <h1 class="hidden md:block text-2xl font-semibold text-gray-900 dark:text-white">{{ market.name }}</h1>
             <p v-if="subtitle" class="md:mt-1 text-sm text-gray-600 dark:text-gray-400">{{ subtitle }}</p>
+            <p v-if="market.sponsor" class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">Sponsored by {{ market.sponsor }}</p>
             <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <span v-if="!market.is_active" class="font-medium text-gray-400 dark:text-gray-500">Inactive</span>
               <span v-if="market.liveness_score !== null" class="inline-flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
@@ -154,6 +155,7 @@ interface MarketDetail {
   city: string | null
   region: string | null
   market_type: string | null
+  sponsor: string | null
   address_line1: string | null
   address_line2: string | null
   province: string | null

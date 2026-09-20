@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $city
  * @property string|null $region one of Market::REGIONS
  * @property string|null $market_type
+ * @property string|null $sponsor business or organization behind the market, when different from its name
  * @property string|null $address_line1
  * @property string|null $address_line2
  * @property string|null $province
@@ -121,6 +122,7 @@ class Market extends Model
         'city',
         'region',
         'market_type',
+        'sponsor',
         'address_line1',
         'address_line2',
         'province',
