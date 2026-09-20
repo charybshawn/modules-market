@@ -1,5 +1,5 @@
 <template>
-  <div class="md:pt-6 pb-6">
+  <div class="md:pt-6 pb-24 md:pb-6">
     <!-- Same outer wrapper as Edit.vue: no base px, the layout's own <main>
          already provides none on mobile by design. -->
     <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
@@ -122,9 +122,21 @@
               </div>
             </dl>
           </section>
+
+          <section v-if="feed.config.enabled" class="hidden md:block">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">History</h2>
+            <div class="mt-3">
+              <MarketEventFilters :feed="feed" />
+            </div>
+            <div class="mt-3 max-h-[32rem] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+              <MarketEventList :feed="feed" />
+            </div>
+          </section>
         </div>
       </div>
     </div>
+
+    <MarketEventsDrawer v-if="feed.config.enabled" :feed="feed" />
   </div>
 </template>
 
@@ -133,6 +145,10 @@ import { computed } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
+import MarketEventFilters from './Partials/MarketEventFilters.vue'
+import MarketEventList from './Partials/MarketEventList.vue'
+import MarketEventsDrawer from './Partials/MarketEventsDrawer.vue'
+import { useMarketEvents, type HistoryConfig } from './Partials/useMarketEvents'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: true }, () => page) })
 
@@ -181,9 +197,13 @@ interface Props {
   market: MarketDetail
   frequencies: Record<string, string>
   livenessLabels: Record<number, string>
+  history: HistoryConfig
 }
 
 const props = defineProps<Props>()
+
+// One feed for both the desktop section and the mobile drawer.
+const feed = useMarketEvents(props.history)
 
 const frequencyLabel = (value: string) => props.frequencies[value] ?? value
 const livenessLabel = (score: number) => props.livenessLabels[score] ?? 'Unknown'
