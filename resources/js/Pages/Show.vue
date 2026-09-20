@@ -2,7 +2,9 @@
   <div class="md:pt-6 pb-24 md:pb-6">
     <!-- Same outer wrapper as Edit.vue: no base px, the layout's own <main>
          already provides none on mobile by design. -->
-    <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+    <!-- Wider than Create/Edit's max-w-3xl: those are forms, this is a
+         read-only detail page whose History section wants the room. -->
+    <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
       <AdminMobileHeader :title="market.name" :href="route('admin.market.index')" />
 
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
@@ -128,7 +130,7 @@
             <div class="mt-3">
               <MarketEventFilters :feed="feed" />
             </div>
-            <div class="mt-3 max-h-[32rem] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+            <div class="mt-3 max-h-[32rem] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 p-4">
               <MarketEventList :feed="feed" />
             </div>
           </section>
