@@ -129,10 +129,13 @@
           </template>
 
           <template #mobile-card="{ item }">
-            <div class="flex items-center gap-3 min-w-0">
-              <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.name }}</span>
-              <span v-if="!item.is_active" class="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">Inactive</span>
-              <span class="shrink-0 truncate max-w-[40%] text-sm text-gray-500 dark:text-gray-400">{{ item.city ?? '—' }}</span>
+            <div class="min-w-0">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.name }}</span>
+                <span v-if="!item.is_active" class="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">Inactive</span>
+                <span class="shrink-0 truncate max-w-[40%] text-sm text-gray-500 dark:text-gray-400">{{ item.city ?? '—' }}</span>
+              </div>
+              <div v-if="item.sponsor" class="truncate text-xs text-gray-400 dark:text-gray-500">{{ item.sponsor }}</div>
             </div>
           </template>
 
@@ -141,6 +144,7 @@
               {{ item.name }}
               <span v-if="!item.is_active" class="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">(Inactive)</span>
             </div>
+            <div v-if="item.sponsor" class="text-xs text-gray-400 dark:text-gray-500">{{ item.sponsor }}</div>
           </template>
 
           <template #cell-city="{ item }">
