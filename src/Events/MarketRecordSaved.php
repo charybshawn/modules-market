@@ -82,7 +82,15 @@ final class MarketRecordSaved
             if ($key === 'updated_at') {
                 continue;
             }
-            $changes[$key] = ['old' => $before[$key] ?? null, 'new' => $new];
+            $old = $before[$key] ?? null;
+            // The raw original is 1/0 from the database while the new value
+            // may already be a real bool (e.g. set by the saving hook); show
+            // booleans as booleans on both sides.
+            if ($market->hasCast($key, ['bool', 'boolean'])) {
+                $old = $old === null ? null : (bool) $old;
+                $new = (bool) $new;
+            }
+            $changes[$key] = ['old' => $old, 'new' => $new];
         }
 
         $schedulesAfter = $market->scheduleSnapshot();
