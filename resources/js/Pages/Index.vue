@@ -44,8 +44,8 @@
            Two tiles: Add Market, Import XML. -->
       <div class="md:hidden mb-6 rounded-lg bg-gray-200 dark:bg-amber-500 px-5 pt-[30px] pb-[20px]">
         <div class="text-center">
-          <div class="text-sm font-bold text-gray-800">Total Markets</div>
-          <div class="mt-1 text-4xl font-extrabold text-emerald-600">{{ props.markets.length }}</div>
+          <div class="text-sm font-bold text-gray-800">Active Markets</div>
+          <div class="mt-1 text-4xl font-extrabold text-emerald-600">{{ props.markets.filter((m) => m.is_active).length }}</div>
         </div>
         <div class="mt-[30px] flex items-center justify-around">
           <div class="flex flex-col items-center gap-3">
@@ -93,7 +93,8 @@
       <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
         <DataTable
           :columns="columns"
-          :items="props.markets"
+          :items="rows"
+          :initial-filters="{ status: 'active' }"
           table-id="market-markets"
           item-key="id"
           searchable
@@ -216,7 +217,17 @@ const livenessDotClass = (score: number) => {
   return 'bg-red-500 dark:bg-red-400'
 }
 
+// Inactive markets (including anything scored 1 or below, which the model
+// deactivates on save) are hidden by default: the Status filter starts on
+// "Active" via :initial-filters, and stays reachable as a filter chip rather
+// than a separate page -- pick Inactive, or clear it to see everything.
+const rows = computed(() => props.markets.map((m) => ({ ...m, status: m.is_active ? 'active' : 'inactive' })))
+
 const columns = computed<Column[]>(() => [
+  {
+    key: 'status', label: 'Status', filterable: true, filterOnly: true,
+    options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+  },
   { key: 'name', label: 'Market', sortable: true },
   { key: 'city', label: 'City', sortable: true, filterable: true, options: props.cities },
   { key: 'region', label: 'Region', sortable: true, filterable: true, options: props.regions },

@@ -166,6 +166,9 @@ class MarketController extends Controller implements HasMiddleware
         if ($result['schedules_skipped'] > 0) {
             $message .= " Skipped {$result['schedules_skipped']} schedule".($result['schedules_skipped'] === 1 ? '' : 's')." missing a valid liveness score (0-4).";
         }
+        if ($result['deactivated'] > 0) {
+            $message .= " Marked {$result['deactivated']} market".($result['deactivated'] === 1 ? '' : 's').' inactive (liveness score '.Market::DEACTIVATE_AT_OR_BELOW.' or below).';
+        }
         if ($result['region_unmatched'] > 0) {
             $message .= " {$result['region_unmatched']} row".($result['region_unmatched'] === 1 ? '' : 's')." had a region that didn't match the controlled list -- imported without one, set it by hand on that market's Edit page.";
         }

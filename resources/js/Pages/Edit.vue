@@ -162,7 +162,7 @@
                   <option :value="null">Not checked</option>
                   <option v-for="(label, score) in props.livenessLabels" :key="score" :value="Number(score)">{{ score }}/4 &middot; {{ label }}</option>
                 </select>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">How confident a check is that this market still actually runs -- see the find-bc-markets skill for how this gets scored.</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">How confident a check is that this market still actually runs -- see the find-bc-markets skill for how this gets scored. A score of 1 or below marks the market inactive when saved.</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Checked On</label>

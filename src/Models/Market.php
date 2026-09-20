@@ -93,6 +93,29 @@ class Market extends Model
         4 => 'Confirmed active',
     ];
 
+    /**
+     * A liveness score at or below this marks the market inactive the moment
+     * it's saved -- "likely defunct" shouldn't keep showing as an active
+     * listing until someone remembers to untick a box. One-directional on
+     * purpose: a higher score later never re-activates it (a person, or an
+     * import, shouldn't silently overrule an earlier deactivation).
+     */
+    public const DEACTIVATE_AT_OR_BELOW = 1;
+
+    protected static function booted(): void
+    {
+        // Only when the score itself is being changed, so an admin who
+        // deliberately re-activates a market can save it again later
+        // without the unchanged score flipping it back off.
+        static::saving(function (Market $market) {
+            if ($market->isDirty('liveness_score')
+                && $market->liveness_score !== null
+                && $market->liveness_score <= self::DEACTIVATE_AT_OR_BELOW) {
+                $market->is_active = false;
+            }
+        });
+    }
+
     protected $fillable = [
         'name',
         'city',

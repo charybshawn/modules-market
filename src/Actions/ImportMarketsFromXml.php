@@ -26,7 +26,7 @@ use SimpleXMLElement;
 class ImportMarketsFromXml
 {
     /**
-     * @return array{created: int, updated: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int}
+     * @return array{created: int, updated: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int}
      */
     public function handle(UploadedFile $file): array
     {
@@ -45,6 +45,7 @@ class ImportMarketsFromXml
         $regionUnmatched = 0;
         $scheduleCount = 0;
         $schedulesSkipped = 0;
+        $deactivated = 0;
 
         foreach ($xml->market as $node) {
             $name = $this->text($node, 'name');
@@ -92,7 +93,15 @@ class ImportMarketsFromXml
                 'liveness_checked_at' => $this->livenessCheckedAt($node, $livenessScore),
             ]);
 
+            // A new market counts as active going in: is_active is unset
+            // (the column's own default applies) until something sets it.
+            $wasActive = $market->exists ? $market->is_active : true;
+
             $market->save();
+
+            if ($wasActive && $market->is_active === false) {
+                $deactivated++;
+            }
 
             $schedules = $this->schedules($node, $schedulesSkipped);
             if ($schedules !== []) {
@@ -114,6 +123,7 @@ class ImportMarketsFromXml
             'region_unmatched' => $regionUnmatched,
             'schedules' => $scheduleCount,
             'schedules_skipped' => $schedulesSkipped,
+            'deactivated' => $deactivated,
         ];
     }
 
