@@ -5,9 +5,11 @@ namespace Cultpantry\Market\Http\Controllers\Admin;
 use App\Actions\GetSiteSetting;
 use App\Http\Controllers\Controller;
 use Cultpantry\Market\Actions\ImportMarketsFromXml;
+use Cultpantry\Market\Contracts\MarketHistory;
 use Cultpantry\Market\Events\MarketRecordDeleted;
 use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
+use Cultpantry\Market\Support\MarketEventPresenter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -99,6 +101,45 @@ class MarketController extends Controller implements HasMiddleware
             'market' => $market->load('schedules'),
             'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
+            // No History section unless the host has said where a market's
+            // history lives (see Contracts\MarketHistory).
+            'history' => [
+                'enabled' => app()->bound(MarketHistory::class),
+                'url' => route('admin.market.events', $market),
+                'kinds' => ['created' => 'Created', 'updated' => 'Edited'],
+                'sources' => ['admin' => 'Admin form', 'xml_import' => 'XML import'],
+                'fields' => MarketEventPresenter::FIELDS,
+            ],
+        ]);
+    }
+
+    /**
+     * One page of a market's change history as JSON, for the History section
+     * on the view page (and its mobile drawer). Filterable by kind, source and
+     * the field that changed; infinite-scrolled with ?page=.
+     */
+    public function events(Request $request, Market $market): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('view', $market);
+        abort_unless(app()->bound(MarketHistory::class), 404);
+
+        $filters = $request->validate([
+            'kind' => ['nullable', Rule::in(['created', 'updated'])],
+            'source' => ['nullable', Rule::in(['admin', 'xml_import'])],
+            'field' => ['nullable', Rule::in(array_keys(MarketEventPresenter::FIELDS))],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $result = app(MarketHistory::class)->forMarket(
+            $market,
+            collect($filters)->only(['kind', 'source', 'field'])->filter()->all(),
+            (int) ($filters['page'] ?? 1),
+            15,
+        );
+
+        return response()->json([
+            'data' => array_map(MarketEventPresenter::present(...), $result['data']),
+            'has_more' => $result['has_more'],
         ]);
     }
 
