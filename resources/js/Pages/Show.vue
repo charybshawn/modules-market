@@ -333,7 +333,7 @@ const isHttpUrl = (value: string | null): value is string => !!value && /^https?
  * keeps every InlineField's own local state (which one is mid-edit, its
  * draft text) intact across the revisit instead of remounting the page.
  */
-const saveField = (field: string, value: string | number | null): Promise<void> => {
+const saveField = (field: string, value: string | number | boolean | null): Promise<void> => {
   return new Promise((resolve, reject) => {
     router.patch(
       route('admin.market.update-field', market.value.id),
@@ -359,7 +359,11 @@ const togglingActive = ref(false)
 const toggleActive = async () => {
   togglingActive.value = true
   try {
-    await saveField('is_active', market.value.is_active ? '' : '1')
+    // A real boolean, not '1'/'' -- Laravel's 'boolean' rule doesn't accept
+    // an empty string (and the ConvertEmptyStringsToNull middleware turns it
+    // into null first anyway), so that pairing silently failed validation
+    // every time with no visible error.
+    await saveField('is_active', !market.value.is_active)
   } catch {
     // The badge just stays as it was -- saveField's own errors aren't
     // surfaced anywhere for this control, so silently not-toggling is the
