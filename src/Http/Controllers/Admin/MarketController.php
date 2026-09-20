@@ -99,6 +99,9 @@ class MarketController extends Controller implements HasMiddleware
 
         return Inertia::render('Vendor/market/Show', [
             'market' => $market->load('schedules'),
+            'cities' => $this->knownValues('city'),
+            'regions' => Market::REGIONS,
+            'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
             // No History section unless the host has said where a market's
@@ -181,6 +184,40 @@ class MarketController extends Controller implements HasMiddleware
             ->with('success', "Market '{$market->name}' updated.");
     }
 
+    /**
+     * Saves one field from the market's Show page, in place -- the inline
+     * editor there never touches schedules (a repeatable, nested resource
+     * that doesn't fit a "click one value, save it" pattern), so this never
+     * calls syncSchedules() the way update() does. Fires the same audit
+     * event as a full-form save, so History can't tell the two apart except
+     * by which fields changed.
+     */
+    public function updateField(Request $request, Market $market): RedirectResponse
+    {
+        $this->authorize('update', $market);
+
+        $rules = $this->fieldRules();
+        $field = $request->input('field');
+        abort_unless(is_string($field) && array_key_exists($field, $rules), 422, 'Not an editable field.');
+
+        $validated = $request->validate([
+            'field' => ['required', 'string', Rule::in(array_keys($rules))],
+            'value' => $rules[$field],
+        ]);
+
+        $before = $market->getAttributes();
+        $schedulesBefore = $market->scheduleSnapshot();
+
+        $market->update([$field => $validated['value']]);
+
+        $event = MarketRecordSaved::forUpdated($market, $before, $schedulesBefore, auth()->id());
+        if ($event->changes !== []) {
+            event($event);
+        }
+
+        return redirect()->route('admin.market.show', $market);
+    }
+
     public function destroy(Market $market): RedirectResponse
     {
         $this->authorize('delete', $market);
@@ -231,9 +268,14 @@ class MarketController extends Controller implements HasMiddleware
         return redirect()->route('admin.market.index')->with('success', $message);
     }
 
-    private function validated(Request $request, ?int $ignoreId = null): array
+    /**
+     * One rule set, shared by the full-form save (validated(), below) and
+     * updateField()'s single-field save -- so a rule can't drift between
+     * the two entry points.
+     */
+    private function fieldRules(): array
     {
-        return $request->validate([
+        return [
             'name' => ['required', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'region' => ['nullable', Rule::in(Market::REGIONS)],
@@ -257,6 +299,13 @@ class MarketController extends Controller implements HasMiddleware
             'liveness_score' => ['nullable', 'integer', 'min:0', 'max:4'],
             'liveness_checked_at' => ['nullable', 'date'],
             'is_active' => ['boolean'],
+        ];
+    }
+
+    private function validated(Request $request, ?int $ignoreId = null): array
+    {
+        return $request->validate([
+            ...$this->fieldRules(),
             'schedules' => ['nullable', 'array'],
             'schedules.*.label' => ['nullable', 'string', 'max:255'],
             'schedules.*.frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
