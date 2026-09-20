@@ -203,6 +203,10 @@ class MarketController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'field' => ['required', 'string', Rule::in(array_keys($rules))],
             'value' => $rules[$field],
+        ], [], [
+            // Otherwise every error reads "The value field is required."
+            // regardless of which field was actually being edited.
+            'value' => MarketEventPresenter::FIELDS[$field] ?? $field,
         ]);
 
         $before = $market->getAttributes();
