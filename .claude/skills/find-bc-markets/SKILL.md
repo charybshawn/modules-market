@@ -54,15 +54,18 @@ matters:
    `market_markets` table read-only, from the cultpantry app:
 
    ```
-   cd /Users/shawn/Documents/code/cultpantry && php artisan tinker --execute="echo \Cultpantry\Market\Models\Market::with('schedules')->where('city', '<city>')->orWhere('region', '<region>')->get(['id','name','city','region','liveness_score','liveness_checked_at','phone','is_active'])->toJson();"
+   cd /Users/shawn/Documents/code/cultpantry && php artisan tinker --execute="echo \Cultpantry\Market\Models\Market::with('schedules')->where('city', '<city>')->orWhere('region', '<region>')->get()->toJson();"
    ```
 
    Match on whichever of city/region the user gave in step 1 (use just one
-   `where` if only one applies). Keep this baseline list in mind through the
-   rest of the research — step 6 compares fresh findings against it, and
-   step 9 reports the diff. This step only reads; nothing about it writes to
-   the database, so it's safe to run every time, including the very first
-   run for a new scope (where it'll just come back empty).
+   `where` if only one applies). Pull every column (no `get([...])` field
+   list) rather than just the liveness-relevant ones — you need the full row
+   on hand, not just enough to score it, because of the carry-forward rule
+   below. Keep this baseline list in mind through the rest of the research —
+   step 6 compares fresh findings against it, and step 9 reports the diff.
+   This step only reads; nothing about it writes to the database, so it's
+   safe to run every time, including the very first run for a new scope
+   (where it'll just come back empty).
 
 3. **Search broadly first.** Use `WebSearch` to find candidate markets:
    market directory pages, Destination BC / regional tourism sites,
@@ -215,15 +218,21 @@ matters:
      the fields you found match what's on file. Still write the `<market>`
      entry — re-importing it bumps `liveness_checked_at` to today, which is
      the point of a re-check: it records that someone actually looked again
-     recently, not just that it was once confirmed active. But it doesn't
-     need a mention of its own in the summary beyond the roll-up count; the
-     user doesn't need to re-read a market that didn't change.
+     recently, not just that it was once confirmed active. Build this entry
+     from the baseline row itself (every field, carried forward as-is), not
+     from scratch — see the schema reference's note on why an omitted field
+     wipes the existing value on re-import rather than leaving it alone. It
+     doesn't need a mention of its own in the summary beyond the roll-up
+     count; the user doesn't need to re-read a market that didn't change.
    - **Changed.** Score moved by more than 1 point, went active↔defunct, or
      a concrete field differs (phone, fees, etc.) from what's on file, or a
      schedule appeared, disappeared, or moved (match schedules within a
-     market by label; the baseline query includes them). Write the entry with the new values, and call this one out by
-     name in the summary with old → new, so it doesn't get buried in a
-     count.
+     market by label; the baseline query includes them). Same carry-forward
+     rule as Unchanged: start from the baseline row and overwrite only the
+     fields that actually changed, not a fresh entry built solely from this
+     pass's findings. Write the entry with the new values, and call this one
+     out by name in the summary with old → new, so it doesn't get buried in
+     a count.
    - **New.** Doesn't match anything in the baseline. Handle exactly as
      before — no special treatment needed beyond what step 5-6 already do.
 

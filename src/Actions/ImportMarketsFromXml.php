@@ -27,7 +27,7 @@ use SimpleXMLElement;
 class ImportMarketsFromXml
 {
     /**
-     * @return array{created: int, updated: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int}
+     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int}
      */
     public function handle(UploadedFile $file): array
     {
@@ -43,6 +43,7 @@ class ImportMarketsFromXml
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $unchanged = 0;
         $regionUnmatched = 0;
         $scheduleCount = 0;
         $schedulesSkipped = 0;
@@ -108,10 +109,14 @@ class ImportMarketsFromXml
             }
 
             $schedules = $this->schedules($node, $schedulesSkipped);
-            if ($schedules !== []) {
+            if ($schedules !== [] && ! $this->schedulesMatch($schedulesBefore, $schedules)) {
                 // Replace-all, but only when the entry actually carried
                 // valid schedules -- a market re-imported without any
-                // shouldn't wipe schedules that were entered by hand.
+                // shouldn't wipe schedules that were entered by hand -- and
+                // only when they actually differ from what's already there,
+                // so re-importing the same file repeatedly doesn't churn the
+                // schedules table (new row ids, a firehose of "updated"
+                // reports) for data that hasn't changed.
                 $market->schedules()->delete();
                 $market->schedules()->createMany($schedules);
                 $scheduleCount += count($schedules);
@@ -120,22 +125,62 @@ class ImportMarketsFromXml
             $event = $isNew
                 ? MarketRecordSaved::forCreated($market, auth()->id(), ['source' => 'xml_import'])
                 : MarketRecordSaved::forUpdated($market, $before, $schedulesBefore, auth()->id(), ['source' => 'xml_import']);
-            if ($isNew || $event->changes !== []) {
-                event($event);
-            }
 
-            $isNew ? $created++ : $updated++;
+            if ($isNew) {
+                event($event);
+                $created++;
+            } elseif ($event->changes !== []) {
+                // $event->changes is Eloquent's own post-save getChanges()
+                // (plus the schedules diff above) -- the same comparison
+                // that decides whether to fire the audit event doubles as
+                // the "did this row actually change" check, so a re-import
+                // of identical data is recognized and counted separately
+                // rather than reported as an update every time.
+                event($event);
+                $updated++;
+            } else {
+                $unchanged++;
+            }
         }
 
         return [
             'created' => $created,
             'updated' => $updated,
+            'unchanged' => $unchanged,
             'skipped' => $skipped,
             'region_unmatched' => $regionUnmatched,
             'schedules' => $scheduleCount,
             'schedules_skipped' => $schedulesSkipped,
             'deactivated' => $deactivated,
         ];
+    }
+
+    /**
+     * Order-insensitive, type-normalized comparison between a market's
+     * current schedule snapshot and a freshly-parsed candidate set, so an
+     * identical re-import is recognized as a no-op rather than always
+     * replacing the rows. liveness_checked_at needs normalizing to a plain
+     * date string on both sides -- the snapshot already stores it that way,
+     * but a freshly-parsed candidate schedule still carries a Carbon
+     * instance at this point (see livenessCheckedAt()).
+     *
+     * @param  array<int, array<string, mixed>>  $before
+     * @param  array<int, array<string, mixed>>  $incoming
+     */
+    private function schedulesMatch(array $before, array $incoming): bool
+    {
+        $key = function (array $row): string {
+            if (($row['liveness_checked_at'] ?? null) instanceof Carbon) {
+                $row['liveness_checked_at'] = $row['liveness_checked_at']->toDateString();
+            }
+            ksort($row);
+
+            return json_encode($row);
+        };
+
+        $normalize = fn (array $rows) => collect($rows)->map($key)->sort()->values()->all();
+
+        return $normalize($before) === $normalize($incoming);
     }
 
     /**

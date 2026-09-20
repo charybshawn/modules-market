@@ -253,6 +253,9 @@ class MarketController extends Controller implements HasMiddleware
         }
 
         $message = "Imported {$result['created']} new and updated {$result['updated']} existing markets.";
+        if ($result['unchanged'] > 0) {
+            $message .= " {$result['unchanged']} existing market".($result['unchanged'] === 1 ? '' : 's').' matched with no changes -- left alone.';
+        }
         if ($result['skipped'] > 0) {
             $message .= " Skipped {$result['skipped']} row".($result['skipped'] === 1 ? '' : 's')." missing a name.";
         }

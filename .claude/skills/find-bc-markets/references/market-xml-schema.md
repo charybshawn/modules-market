@@ -65,6 +65,25 @@ leaving it empty — the import treats a missing element and an empty one the
 same way (both become `null`), but omitting is cleaner and makes it obvious
 at a glance what you actually found versus didn't.
 
+**That "omit what you didn't find" rule is for a brand-new market only.**
+The import does a full `fill()` on every `<market>` node it matches by
+(name, city) — there's no partial-patch mode. For a market that's *already
+in the database*, an omitted element doesn't leave the existing value
+alone; it overwrites it with `null`, same as an empty one. So when writing
+an entry for a market you pulled from a baseline query (a re-check,
+`find-bc-markets` step 6's "Unchanged"/"Changed" case, or the
+`refresh-bc-markets` skill), start from that baseline row's own field
+values and carry every one of them forward into the XML unchanged, then
+overwrite only the specific fields you actually found new information for.
+Never regenerate an existing market's entry from scratch using only what
+this pass happened to turn up — that silently blanks every field the pass
+didn't touch. Schedules follow the same logic one level down: a re-import
+replaces a market's schedules wholesale *only when the entry includes a
+`<schedules>` block at all* (an entry with none leaves existing schedules
+alone) — but the moment you do include one, every `<schedule>` inside it
+needs to be complete, since there's no per-schedule carry-forward once
+you've opted in to replacing the set.
+
 | Element | Notes |
 |---|---|
 | `name` | Required. |
@@ -109,9 +128,21 @@ markets will have just one.
 | `liveness_score` | **Required.** `0`-`4`, scored per schedule (see SKILL.md step 6). A schedule without a valid one is skipped on import and reported, not imported with a guess. |
 | `liveness_checked_at` | Same rules as on `<market>`: defaults to the import date; leave it out normally. |
 
+## Always start with an XML declaration
+
+Always write `<?xml version="1.0" encoding="UTF-8"?>` as the file's first
+line. `SimpleXMLElement` and `DOMDocument` parse a file fine without it, so
+it's easy to skip — but Laravel's upload validation (`mimes:xml`) MIME-sniffs
+the raw file content, and a file that starts straight with `<markets>` gets
+detected as `text/plain` instead of `text/xml`/`application/xml`, which fails
+that rule with "The file field must be a file of type: xml" even though the
+XML itself is perfectly well-formed. Check with `file --mime-type <path>`
+before handing a file off — it should report `text/xml`, not `text/plain`.
+
 ## Example
 
 ```xml
+<?xml version="1.0" encoding="UTF-8"?>
 <markets>
   <market>
     <name>Salmon Arm Farmers Market</name>
