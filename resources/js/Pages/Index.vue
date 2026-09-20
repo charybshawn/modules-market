@@ -91,6 +91,124 @@
            DataTable's sticky toolbar, pinning it at a fixed offset inside
            this box instead of sticking to the viewport. -->
       <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
+        <!-- Filters DataTable's own chips can't express: schedule frequency
+             with exclusion ("not weekly"), months a schedule falls in, and a
+             liveness range. They narrow `rows` before DataTable sees them. -->
+        <div class="border-b border-gray-200 dark:border-gray-700">
+          <button
+            type="button"
+            class="tap-target-touch flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+            :aria-expanded="showMoreFilters"
+            @click="showMoreFilters = !showMoreFilters"
+          >
+            <span class="inline-flex items-center gap-2">
+              Schedule &amp; liveness filters
+              <span
+                v-if="customFilterCount"
+                class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white"
+              >{{ customFilterCount }}</span>
+            </span>
+            <svg class="w-4 h-4 transition-transform" :class="showMoreFilters ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div v-if="showMoreFilters" class="space-y-5 px-4 pb-5">
+            <div>
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Frequency</h3>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  v-for="(label, key) in props.frequencies"
+                  :key="key"
+                  type="button"
+                  :aria-pressed="!!freqStates[key]"
+                  :class="[chipBase, chipClass(freqStates[key])]"
+                  @click="cycleFrequency(String(key))"
+                >{{ freqStates[key] === 'exclude' ? 'Not ' : '' }}{{ label }}</button>
+              </div>
+              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Click once to include, again to exclude, a third time to clear.</p>
+            </div>
+
+            <div>
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Occurring in</h3>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  v-for="(name, i) in MONTHS"
+                  :key="name"
+                  type="button"
+                  :aria-pressed="months.includes(i + 1)"
+                  :class="[chipBase, chipClass(months.includes(i + 1) ? 'include' : undefined)]"
+                  @click="toggleMonth(i + 1)"
+                >{{ name }}</button>
+              </div>
+              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Any year, so last year's edition counts for next year. Schedules without dates never match a month.</p>
+            </div>
+
+            <div v-if="includeFreqs.length && months.length" class="flex flex-wrap items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+              <span>Show schedules that match</span>
+              <span class="inline-flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-600">
+                <button
+                  v-for="mode in ['all', 'any'] as const"
+                  :key="mode"
+                  type="button"
+                  :aria-pressed="matchMode === mode"
+                  class="px-3 py-1 text-sm"
+                  :class="matchMode === mode ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300'"
+                  @click="matchMode = mode"
+                >{{ mode === 'all' ? 'both filters' : 'either filter' }}</button>
+              </span>
+            </div>
+
+            <div>
+              <div class="flex items-baseline justify-between">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Liveness</h3>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{ livenessMin }}/4 &ndash; {{ livenessMax }}/4</span>
+              </div>
+              <div class="relative mt-2 h-6">
+                <div class="absolute inset-x-[9px] top-1/2 h-1 -translate-y-1/2 rounded-full bg-gray-200 dark:bg-gray-600">
+                  <div
+                    class="absolute h-1 rounded-full bg-indigo-500"
+                    :style="{ left: `${livenessMin * 25}%`, width: `${(livenessMax - livenessMin) * 25}%` }"
+                  ></div>
+                </div>
+                <input
+                  type="range" min="0" max="4" step="1"
+                  :value="livenessMin"
+                  aria-label="Minimum liveness score"
+                  class="liveness-range absolute inset-0 w-full"
+                  :style="{ zIndex: livenessMin === livenessMax && livenessMax >= 3 ? 5 : 3 }"
+                  @input="setLivenessMin($event)"
+                />
+                <input
+                  type="range" min="0" max="4" step="1"
+                  :value="livenessMax"
+                  aria-label="Maximum liveness score"
+                  class="liveness-range absolute inset-0 w-full"
+                  style="z-index: 4"
+                  @input="setLivenessMax($event)"
+                />
+              </div>
+              <div class="mt-0.5 flex justify-between px-1 text-xs text-gray-400 dark:text-gray-500">
+                <span v-for="n in 5" :key="n">{{ n - 1 }}</span>
+              </div>
+              <label v-if="livenessFilterActive" class="tap-target-touch mt-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input v-model="includeUnchecked" type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700" />
+                Also show markets that haven't been checked
+              </label>
+              <p v-if="livenessFilterActive && livenessMin <= 1" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                Markets scoring 1 or below are marked inactive &mdash; also tick Inactive under Filters to see them.
+              </p>
+            </div>
+
+            <button
+              v-if="customFilterCount"
+              type="button"
+              class="tap-target-touch text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
+              @click="clearCustomFilters"
+            >Clear these filters</button>
+          </div>
+        </div>
+
         <DataTable
           :columns="columns"
           :items="rows"
@@ -99,8 +217,8 @@
           item-key="id"
           searchable
           search-placeholder="Search markets..."
-          empty-message="No markets yet."
-          empty-action-label="Add your first market"
+          :empty-message="customFilterCount ? 'No markets match these schedule or liveness filters.' : 'No markets yet.'"
+          :empty-action-label="customFilterCount ? '' : 'Add your first market'"
           :empty-action-href="route('admin.market.create')"
           mobile-row-style="line"
           :row-href="(item) => route('admin.market.show', item.id)"
@@ -134,7 +252,12 @@
 
           <template #cell-schedules="{ item }">
             <div v-if="item.schedules.length" class="text-sm text-gray-500 dark:text-gray-400">
-              <div v-for="schedule in item.schedules.slice(0, 2)" :key="schedule.id" class="truncate">{{ scheduleSummary(schedule) }}</div>
+              <div
+                v-for="schedule in orderedSchedules(item).slice(0, 2)"
+                :key="schedule.id"
+                class="truncate"
+                :class="item.matched_schedule_ids.includes(schedule.id) ? 'font-medium text-gray-900 dark:text-white' : ''"
+              >{{ scheduleSummary(schedule) }}</div>
               <div v-if="item.schedules.length > 2" class="text-xs text-gray-400 dark:text-gray-500">+{{ item.schedules.length - 2 }} more</div>
             </div>
             <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
@@ -175,6 +298,8 @@ interface ScheduleRow {
   id: number
   label: string | null
   frequency: string | null
+  start_date: string | null
+  end_date: string | null
 }
 
 interface MarketRow {
@@ -202,8 +327,27 @@ interface Props {
 const props = defineProps<Props>()
 
 const frequencyLabel = (value: string) => props.frequencies[value] ?? value
+// Eloquent serializes date casts as ISO datetimes; parse the YYYY-MM-DD prefix
+// as a local date so a timezone offset can't shift the day.
+const shortDate = (iso: string) => {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+const scheduleDates = (schedule: ScheduleRow) => {
+  const start = schedule.start_date?.slice(0, 10)
+  const end = schedule.end_date?.slice(0, 10)
+  if (start && end && start !== end) return `${shortDate(start)} – ${shortDate(end)}`
+  const only = start ?? end
+  return only ? shortDate(only) : null
+}
+// Dates join the summary once a frequency or month filter is on, since
+// "which October?" is the whole point then; the plain list stays compact.
 const scheduleSummary = (schedule: ScheduleRow) =>
-  [schedule.label, schedule.frequency ? frequencyLabel(schedule.frequency) : null].filter(Boolean).join(' · ') || 'Schedule'
+  [
+    schedule.label,
+    schedule.frequency ? frequencyLabel(schedule.frequency) : null,
+    includeFreqs.value.length || excludeFreqs.value.length || months.value.length ? scheduleDates(schedule) : null,
+  ].filter(Boolean).join(' · ') || 'Schedule'
 const livenessLabel = (score: number) => props.livenessLabels[score] ?? 'Unknown'
 
 // Matches the skill's own scoring bands (see .claude/skills/find-bc-markets/
@@ -221,7 +365,132 @@ const livenessDotClass = (score: number) => {
 // deactivates on save) are hidden by default: the Status filter starts on
 // "Active" via :initial-filters, and stays reachable as a filter chip rather
 // than a separate page -- tick Inactive as well, or clear it to see everything.
-const rows = computed(() => props.markets.map((m) => ({ ...m, status: m.is_active ? 'active' : 'inactive' })))
+// ---- Custom filters (schedule frequency, month, liveness range) ----
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+const showMoreFilters = ref(false)
+const freqStates = ref<Record<string, 'include' | 'exclude'>>({})
+const months = ref<number[]>([])
+const matchMode = ref<'all' | 'any'>('all')
+const livenessMin = ref(0)
+const livenessMax = ref(4)
+const includeUnchecked = ref(false)
+
+const includeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'include').map(([k]) => k))
+const excludeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'exclude').map(([k]) => k))
+const livenessFilterActive = computed(() => livenessMin.value > 0 || livenessMax.value < 4)
+// One badge count per active group, matching how DataTable counts its chips.
+const customFilterCount = computed(() =>
+  (includeFreqs.value.length || excludeFreqs.value.length ? 1 : 0) + (months.value.length ? 1 : 0) + (livenessFilterActive.value ? 1 : 0),
+)
+
+const cycleFrequency = (key: string) => {
+  const next = { ...freqStates.value }
+  if (!next[key]) next[key] = 'include'
+  else if (next[key] === 'include') next[key] = 'exclude'
+  else delete next[key]
+  freqStates.value = next
+}
+const toggleMonth = (month: number) => {
+  months.value = months.value.includes(month) ? months.value.filter((m) => m !== month) : [...months.value, month]
+}
+// Thumbs can't cross; the DOM value is reset too, because when the clamp lands
+// on the model's old value Vue sees no change and would leave the thumb
+// wherever it was dragged.
+const setLivenessMin = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  livenessMin.value = Math.min(input.valueAsNumber, livenessMax.value)
+  input.value = String(livenessMin.value)
+}
+const setLivenessMax = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  livenessMax.value = Math.max(input.valueAsNumber, livenessMin.value)
+  input.value = String(livenessMax.value)
+}
+const clearCustomFilters = () => {
+  freqStates.value = {}
+  months.value = []
+  matchMode.value = 'all'
+  livenessMin.value = 0
+  livenessMax.value = 4
+  includeUnchecked.value = false
+}
+
+const chipBase = 'tap-target-touch inline-flex items-center rounded-full border px-3 py-1 text-sm'
+const chipClass = (state: 'include' | 'exclude' | undefined) => {
+  if (state === 'include') return 'border-indigo-600 bg-indigo-600 text-white'
+  if (state === 'exclude') return 'border-red-500 bg-red-50 text-red-700 line-through dark:bg-red-900/20 dark:text-red-300'
+  return 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300'
+}
+
+// Every calendar month a schedule touches, ignoring the year: a 2023 edition
+// in November still says "this runs in November". A schedule with no dates
+// covers nothing (unknown, not "always"); one date covers just its month.
+const monthsCovered = (schedule: ScheduleRow): Set<number> => {
+  const covered = new Set<number>()
+  const start = schedule.start_date?.slice(0, 10)
+  const end = schedule.end_date?.slice(0, 10)
+  if (!start && !end) return covered
+  if (!start || !end) {
+    covered.add(Number((start ?? end)!.slice(5, 7)))
+    return covered
+  }
+  let year = Number(start.slice(0, 4))
+  let month = Number(start.slice(5, 7))
+  const last = Number(end.slice(0, 4)) * 12 + Number(end.slice(5, 7))
+  for (let i = 0; i < 12 && year * 12 + month <= last; i++) {
+    covered.add(month)
+    if (++month > 12) { month = 1; year++ }
+  }
+  return covered
+}
+
+// An excluded frequency can never match; otherwise a schedule must satisfy
+// whichever include groups are active, all of them or any of them.
+const scheduleMatches = (schedule: ScheduleRow): boolean => {
+  if (schedule.frequency && excludeFreqs.value.includes(schedule.frequency)) return false
+  const checks: boolean[] = []
+  if (includeFreqs.value.length) checks.push(!!schedule.frequency && includeFreqs.value.includes(schedule.frequency))
+  if (months.value.length) {
+    const covered = monthsCovered(schedule)
+    checks.push(months.value.some((m) => covered.has(m)))
+  }
+  if (!checks.length) return true
+  return matchMode.value === 'all' ? checks.every(Boolean) : checks.some(Boolean)
+}
+
+const rows = computed(() => {
+  let list = props.markets.map((m) => ({
+    ...m,
+    status: m.is_active ? 'active' : 'inactive',
+    matched_schedule_ids: [] as number[],
+  }))
+
+  if (livenessFilterActive.value) {
+    list = list.filter((m) =>
+      m.liveness_score === null
+        ? includeUnchecked.value
+        : m.liveness_score >= livenessMin.value && m.liveness_score <= livenessMax.value,
+    )
+  }
+
+  if (!includeFreqs.value.length && !excludeFreqs.value.length && !months.value.length) return list
+
+  const needsAMatch = includeFreqs.value.length > 0 || months.value.length > 0
+  return list.flatMap((m) => {
+    const matched = m.schedules.filter(scheduleMatches)
+    if (needsAMatch) return matched.length ? [{ ...m, matched_schedule_ids: matched.map((s) => s.id) }] : []
+    // Only exclusions: hide a market once *all* its schedules are excluded
+    // ("not weekly" drops a weekly-only market), but keep one that has none.
+    return m.schedules.length && !matched.length ? [] : [m]
+  })
+})
+
+// Matching schedules first, so the reason a market matched is what you see.
+const orderedSchedules = (item: { schedules: ScheduleRow[]; matched_schedule_ids: number[] }) =>
+  item.matched_schedule_ids.length
+    ? [...item.schedules].sort((a, b) => Number(item.matched_schedule_ids.includes(b.id)) - Number(item.matched_schedule_ids.includes(a.id)))
+    : item.schedules
 
 const columns = computed<Column[]>(() => [
   {
@@ -234,20 +503,10 @@ const columns = computed<Column[]>(() => [
   { key: 'market_type', label: 'Type', hideable: true, filterable: true, filterType: 'multiselect', options: props.marketTypes },
   { key: 'schedules', label: 'Schedules', hideable: true },
   { key: 'phone', label: 'Phone', hideable: true },
-  {
-    // No "Not checked" option here, deliberately -- DataTable's own
-    // isFilterValueActive() treats an empty-string filter value as "no
-    // filter selected" (confirmed live: selecting an option bound to ''
-    // silently filters nothing, since it reads as identical to Any). That
-    // collides with String(null ?? '') also being '', which is what a
-    // genuinely unchecked market's score compares as -- there's no value
-    // this column's own options can carry that both means "unchecked" to
-    // the comparison AND registers as "a filter is active" to DataTable.
-    // Sort ascending on this column instead to find unchecked/low-score
-    // markets (they sort first).
-    key: 'liveness_score', label: 'Liveness', sortable: true, hideable: true, filterable: true, filterType: 'multiselect',
-    options: Object.entries(props.livenessLabels).map(([value, label]) => ({ value, label: `${value}/4 · ${label}` })),
-  },
+  // Filtered with the range slider in the panel above instead of a chip: a
+  // range suits a 0-4 scale, and it can include unchecked markets, which
+  // DataTable's own empty-value handling couldn't.
+  { key: 'liveness_score', label: 'Liveness', sortable: true, hideable: true },
 ])
 
 // A plain useForm (not usePersistedForm) -- a File object can't be
@@ -277,3 +536,49 @@ const handleFileChange = (event: Event) => {
   })
 }
 </script>
+
+<style scoped>
+/* Two overlaid range inputs make one two-thumb slider: the inputs themselves
+   ignore the pointer so the top one doesn't block the other, and only the
+   thumbs take clicks. */
+.liveness-range {
+  pointer-events: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  height: 1.5rem;
+  margin: 0;
+}
+.liveness-range::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.liveness-range::-moz-range-track {
+  background: transparent;
+}
+.liveness-range::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: #4f46e5;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #4f46e5;
+  cursor: pointer;
+}
+.liveness-range::-moz-range-thumb {
+  pointer-events: auto;
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  background: #4f46e5;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #4f46e5;
+  cursor: pointer;
+}
+.liveness-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+</style>
