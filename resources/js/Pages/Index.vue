@@ -94,7 +94,7 @@
         <DataTable
           :columns="columns"
           :items="rows"
-          :initial-filters="{ status: 'active' }"
+          :initial-filters="{ status: ['active'] }"
           table-id="market-markets"
           item-key="id"
           searchable
@@ -220,18 +220,18 @@ const livenessDotClass = (score: number) => {
 // Inactive markets (including anything scored 1 or below, which the model
 // deactivates on save) are hidden by default: the Status filter starts on
 // "Active" via :initial-filters, and stays reachable as a filter chip rather
-// than a separate page -- pick Inactive, or clear it to see everything.
+// than a separate page -- tick Inactive as well, or clear it to see everything.
 const rows = computed(() => props.markets.map((m) => ({ ...m, status: m.is_active ? 'active' : 'inactive' })))
 
 const columns = computed<Column[]>(() => [
   {
-    key: 'status', label: 'Status', filterable: true, filterOnly: true,
+    key: 'status', label: 'Status', filterable: true, filterType: 'multiselect', filterOnly: true,
     options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
   },
   { key: 'name', label: 'Market', sortable: true },
-  { key: 'city', label: 'City', sortable: true, filterable: true, options: props.cities },
-  { key: 'region', label: 'Region', sortable: true, filterable: true, options: props.regions },
-  { key: 'market_type', label: 'Type', hideable: true, filterable: true, options: props.marketTypes },
+  { key: 'city', label: 'City', sortable: true, filterable: true, filterType: 'multiselect', options: props.cities },
+  { key: 'region', label: 'Region', sortable: true, filterable: true, filterType: 'multiselect', options: props.regions },
+  { key: 'market_type', label: 'Type', hideable: true, filterable: true, filterType: 'multiselect', options: props.marketTypes },
   { key: 'schedules', label: 'Schedules', hideable: true },
   { key: 'phone', label: 'Phone', hideable: true },
   {
@@ -245,7 +245,7 @@ const columns = computed<Column[]>(() => [
     // the comparison AND registers as "a filter is active" to DataTable.
     // Sort ascending on this column instead to find unchecked/low-score
     // markets (they sort first).
-    key: 'liveness_score', label: 'Liveness', sortable: true, hideable: true, filterable: true,
+    key: 'liveness_score', label: 'Liveness', sortable: true, hideable: true, filterable: true, filterType: 'multiselect',
     options: Object.entries(props.livenessLabels).map(([value, label]) => ({ value, label: `${value}/4 · ${label}` })),
   },
 ])
