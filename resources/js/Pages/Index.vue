@@ -110,53 +110,8 @@
         >
           <!-- Filters DataTable's own chips can't express: schedule frequency
                with exclusion ("not weekly"), months a schedule falls in, and a
-               liveness range. They narrow `rows` before DataTable sees them.
-               A toolbar button + popover, next to the built-in Filters button,
-               so it's found where filters are found. -->
-          <template #toolbar-extra>
-            <div ref="customFiltersRoot" class="relative" @keydown.esc="showMoreFilters = false">
-              <button
-                type="button"
-                aria-label="Schedule and liveness filters"
-                :aria-expanded="showMoreFilters"
-                class="tap-target-touch inline-flex items-center px-2.5 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                @click="showMoreFilters = !showMoreFilters"
-              >
-                <svg class="w-4 h-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span class="hidden sm:inline">Schedule &amp; liveness</span>
-                <span
-                  v-if="customFilterCount"
-                  class="ml-1.5 inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-indigo-600 text-white text-[11px] font-semibold leading-none"
-                >{{ customFilterCount }}</span>
-                <svg class="w-4 h-4 ml-1 transition-transform" :class="{ 'rotate-180': showMoreFilters }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              <div
-                v-if="showMoreFilters"
-                class="absolute -left-6 top-full z-30 mt-2 w-screen max-w-md max-h-[75vh] overflow-y-auto space-y-5 rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:left-0 sm:w-[30rem] sm:max-w-none dark:border-gray-600 dark:bg-gray-800"
-              >
-                <ScheduleLiveFilters
-                  v-model:freq-states="freqStates"
-                  v-model:months="months"
-                  v-model:match-mode="matchMode"
-                  v-model:liveness-min="livenessMin"
-                  v-model:liveness-max="livenessMax"
-                  v-model:include-unchecked="includeUnchecked"
-                  :frequencies="props.frequencies"
-                  :custom-filter-count="customFilterCount"
-                  @clear="clearCustomFilters"
-                />
-              </div>
-            </div>
-          </template>
-
-          <!-- The same controls inside DataTable's own Filters dropdown, so
-               nothing lives outside it; the toolbar popover above is a
-               shortcut to the same state. -->
+               liveness range. They render inside DataTable's Filters dropdown
+               and narrow `rows` before DataTable sees them. -->
           <template #filters-extra>
             <div class="border-t border-gray-200 pt-4 dark:border-gray-600">
               <ScheduleLiveFilters
@@ -235,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
@@ -318,15 +273,6 @@ const livenessDotClass = (score: number) => {
 // than a separate page -- tick Inactive as well, or clear it to see everything.
 // ---- Custom filters (schedule frequency, month, liveness range) ----
 
-const showMoreFilters = ref(false)
-const customFiltersRoot = ref<HTMLElement | null>(null)
-const closeOnOutsideClick = (event: MouseEvent) => {
-  if (showMoreFilters.value && customFiltersRoot.value && !customFiltersRoot.value.contains(event.target as Node)) {
-    showMoreFilters.value = false
-  }
-}
-onMounted(() => document.addEventListener('mousedown', closeOnOutsideClick))
-onBeforeUnmount(() => document.removeEventListener('mousedown', closeOnOutsideClick))
 const freqStates = ref<Record<string, 'include' | 'exclude'>>({})
 const months = ref<number[]>([])
 const matchMode = ref<'all' | 'any'>('all')
