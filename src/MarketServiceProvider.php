@@ -19,6 +19,13 @@ class MarketServiceProvider extends ServiceProvider
         // 2. Migrations for this module's own table (market_markets).
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
+        // 2b. Blade views (currently just the PDF export template),
+        //     namespaced 'market::' so `market::pdf.markets` resolves
+        //     without publishing -- unlike the Vue pages below, a
+        //     server-rendered Blade view doesn't need to live inside the
+        //     host app's own resource tree to be found.
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'market');
+
         // 3. Nav entry. 'match' covers every market/* sub-page so the
         //    sidebar entry stays highlighted across Index/Create/Edit.
         AdminNav::register([

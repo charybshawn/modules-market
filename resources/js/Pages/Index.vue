@@ -26,6 +26,25 @@
             <span v-if="importForm.processing">Importing...</span>
             <span v-else>Import XML</span>
           </button>
+          <!-- Plain <a>, not Inertia's <Link>: <Link> intercepts the click
+               and treats the file response (no X-Inertia header) as a
+               failed page visit -- confirmed by hand, it shows a blank
+               in-page overlay instead of letting the browser download the
+               file. A native anchor isn't intercepted at all. -->
+          <a
+            :href="route('admin.market.export')"
+            title="Downloads every market (active and inactive) as an XML file shaped for this same Import XML form -- for moving the whole list to another server."
+            class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+          >
+            Export XML
+          </a>
+          <a
+            :href="pdfExportHref"
+            :title="`Downloads a print-ready PDF of the ${filteredIds.length} market${filteredIds.length === 1 ? '' : 's'} currently shown below (respects search and filters).`"
+            class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+          >
+            Download PDF
+          </a>
           <Link
             :href="route('admin.market.create')"
             class="tap-target-touch inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
@@ -74,6 +93,30 @@
             </button>
             <span class="text-xs font-['Archivo_Black'] uppercase tracking-wide text-amber-500 dark:text-white leading-tight text-center">Import<br>XML</span>
           </div>
+
+          <div class="flex flex-col items-center gap-3">
+            <a
+              :href="route('admin.market.export')"
+              class="tap-target-touch w-16 h-16 rounded-2xl bg-white dark:bg-gray-900 shadow-md dark:shadow-[0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-center"
+            >
+              <svg class="w-11 h-11 text-amber-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M7 13l5-5 5 5M12 3v11" />
+              </svg>
+            </a>
+            <span class="text-xs font-['Archivo_Black'] uppercase tracking-wide text-amber-500 dark:text-white leading-tight text-center">Export<br>XML</span>
+          </div>
+
+          <div class="flex flex-col items-center gap-3">
+            <a
+              :href="pdfExportHref"
+              class="tap-target-touch w-16 h-16 rounded-2xl bg-white dark:bg-gray-900 shadow-md dark:shadow-[0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-center"
+            >
+              <svg class="w-11 h-11 text-amber-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </a>
+            <span class="text-xs font-['Archivo_Black'] uppercase tracking-wide text-amber-500 dark:text-white leading-tight text-center">Download<br>PDF</span>
+          </div>
         </div>
       </div>
 
@@ -98,6 +141,7 @@
           filter-grid-class="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
           :extra-filter-count="customFilterCount"
           @clear-filters="clearCustomFilters"
+          @update:filtered-ids="(ids) => (filteredIds = ids as number[])"
           table-id="market-markets"
           item-key="id"
           searchable
@@ -421,4 +465,12 @@ const handleFileChange = (event: Event) => {
     },
   })
 }
+
+// Kept in sync by DataTable's own @update:filtered-ids -- the ids of
+// exactly what filteredItems holds there right now (after its search box,
+// status/city/region/type chips, and this page's own schedule/liveness
+// filters above have all applied), so the PDF download always matches
+// what's actually on screen rather than the pre-DataTable-filtering `rows`.
+const filteredIds = ref<number[]>([])
+const pdfExportHref = computed(() => route('admin.market.export-pdf', { ids: filteredIds.value.join(',') }))
 </script>

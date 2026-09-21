@@ -40,4 +40,13 @@ class MarketPolicy
     {
         return $user->isAdmin();
     }
+
+    /**
+     * Class-level ability for the XML export download, same reasoning as
+     * import() above.
+     */
+    public function export(User $user): bool
+    {
+        return $user->isAdmin();
+    }
 }

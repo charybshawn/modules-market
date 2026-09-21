@@ -4,6 +4,8 @@ namespace Cultpantry\Market\Http\Controllers\Admin;
 
 use App\Actions\GetSiteSetting;
 use App\Http\Controllers\Controller;
+use Cultpantry\Market\Actions\ExportMarketsToPdf;
+use Cultpantry\Market\Actions\ExportMarketsToXml;
 use Cultpantry\Market\Actions\ImportMarketsFromXml;
 use Cultpantry\Market\Contracts\MarketHistory;
 use Cultpantry\Market\Events\MarketRecordDeleted;
@@ -308,6 +310,67 @@ class MarketController extends Controller implements HasMiddleware
         }
 
         return redirect()->route('admin.market.index')->with('success', $message);
+    }
+
+    /**
+     * Downloads every market (active and inactive alike -- this is for
+     * migrating the whole table to another server, not a filtered report)
+     * as the same XML shape ImportMarketsFromXml reads, so the file this
+     * produces can be dropped straight onto another server's Import XML
+     * form. A plain GET returning a raw file response rather than an
+     * Inertia page, same pattern as InventoryController::generateReport()
+     * in the main app. Must be linked with a plain <a href>, not Inertia's
+     * <Link> -- confirmed by hand that <Link> intercepts the click, gets a
+     * response with no X-Inertia header, and shows a blank in-page overlay
+     * instead of letting the browser download the file.
+     */
+    public function export(ExportMarketsToXml $exportMarketsToXml): \Illuminate\Http\Response
+    {
+        $this->authorize('export', Market::class);
+
+        $markets = Market::with('schedules')->orderBy('name')->get();
+        $xml = $exportMarketsToXml->handle($markets);
+        $filename = 'markets-export-'.Carbon::today()->toDateString().'.xml';
+
+        return response($xml)
+            ->header('Content-Type', 'text/xml; charset=UTF-8')
+            ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+    }
+
+    /**
+     * Downloads a curated, print-ready PDF of whatever set of markets the
+     * caller names -- normally the Index page's *currently filtered* rows
+     * (search, status, city/region/type chips, and the market-specific
+     * schedule/liveness filters all happen client-side, so the browser is
+     * the only place that knows the true current result set; it sends that
+     * set's ids here rather than the server trying to re-derive it). Same
+     * plain-<a>-not-<Link> requirement as export() above, for the same
+     * reason.
+     */
+    public function exportPdf(Request $request, ExportMarketsToPdf $exportMarketsToPdf): \Illuminate\Http\Response
+    {
+        $this->authorize('export', Market::class);
+
+        $validated = $request->validate([
+            'ids' => ['nullable', 'string'],
+        ]);
+
+        $query = Market::with('schedules')->orderBy('name');
+
+        // No ids at all (rather than an empty string) means "export
+        // everything" -- e.g. a direct link with no filter state to report,
+        // same fallback as export()'s own full-table XML dump.
+        if (array_key_exists('ids', $validated) && $validated['ids'] !== null) {
+            $ids = array_filter(array_map('trim', explode(',', $validated['ids'])), fn ($id) => ctype_digit($id));
+            $query->whereIn('id', $ids);
+        }
+
+        $pdf = $exportMarketsToPdf->handle($query->get());
+        $filename = 'markets-'.Carbon::today()->toDateString().'.pdf';
+
+        return response($pdf)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
     }
 
     /**
