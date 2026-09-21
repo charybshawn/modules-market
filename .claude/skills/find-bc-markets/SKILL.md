@@ -74,6 +74,43 @@ matters:
    often surfaces the market's Facebook page URL too, which you'll need for
    step 4.
 
+   **Always also check Castanet's events page directly**
+   (`https://www.castanet.net/events`) for the scope's town or region.
+   Castanet covers most of the BC Interior (Okanagan, Shuswap, Kamloops/
+   Thompson, Kootenays) and its events listings regularly carry markets,
+   garlic/harvest festivals and craft fairs that a generic web search
+   misses — treat it as a standing source to check, not just another search
+   term, the same way step 4 treats a market's own Facebook page. The
+   Events page has a region/city picker down the side (Central Okanagan,
+   South Okanagan, North Okanagan, Thompson-Shuswap, Kootenays, Vancouver,
+   each with its own city list) with a `CRAFTS/MARKETS` category filter —
+   pick the scope's actual sub-region rather than reading whatever loads by
+   default (the bare URL defaults to Kelowna/Central Okanagan). Castanet
+   also runs a **separate homepage per region** (e.g.
+   `castanet.net/vernon/` for North Okanagan; the bare `castanet.net/` is
+   Kelowna's) carrying that area's own local news, which is worth a look
+   alongside the events page for closure/relocation stories the second-pass
+   step below searches for.
+
+   **For Shuswap-area scopes (Salmon Arm, Sicamous, Sorrento, Falkland,
+   Enderby and similar), also check the Salmon Arm Observer directly**
+   (`https://saobserver.net/`) — it's the dedicated local paper for that
+   area and regularly covers markets, fairs and festivals (openings,
+   closures, relocations, road-closure approvals) that Castanet's
+   North Okanagan/Thompson-Shuswap coverage doesn't reach as reliably.
+
+   **Local radio stations are worth checking too, specifically their
+   written community events calendar, not the station's on-air schedule.**
+   Confirmed working example: `myshuswapnow.com/community-calendar/` (Shuswap)
+   is a real, dated, text-searchable calendar of community events —
+   distinct from the station's own on-air "Community Events Calendar"
+   segment, which on at least one Shuswap station (CKVS 93.7) is audio-only
+   and not usable for research. Other BC Interior towns often have an
+   equivalently-branded local station site (a `my<town>now.com`-style
+   domain) with the same kind of calendar — search for "`<town> radio
+   station community events`" to find the right one rather than guessing
+   the URL, since the pattern isn't confirmed for every region.
+
 4. **Visit Facebook and Instagram pages through the browser, not
    WebFetch.** For any market whose primary online presence is a Facebook
    page or Instagram profile (common for smaller markets — a market's own
@@ -254,7 +291,15 @@ matters:
    searches per item, not an exhaustive sweep:
 
    - **Local news and community papers** — the market's name plus words like
-     "closing", "cancelled", "final season", "new location", "returns".
+     "closing", "cancelled", "final season", "new location", "returns". For
+     BC Interior scopes, check Castanet directly rather than relying on a
+     general web search: its region-specific homepage (`castanet.net/vernon/`,
+     etc. — not the bare `castanet.net/`, which is Kelowna's) and its events
+     page filtered to the scope's sub-region. For Shuswap-area markets, also
+     check the Salmon Arm Observer directly (`https://saobserver.net/`) and
+     that area's local radio station community calendar
+     (`myshuswapnow.com/community-calendar/`, or search for the equivalent
+     in another town).
    - **Municipal and venue sources** — the city's events calendar, parks and
      rec, council agendas or minutes mentioning the market, and the venue's
      own page (the park, mall, or plaza it's held at).

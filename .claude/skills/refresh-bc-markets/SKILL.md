@@ -100,7 +100,17 @@ schedule list would quietly drop real data.
      escalate to `find-bc-markets` step 7's second-pass source list (local
      news, municipal/venue pages, current-year program lists, the vendor
      side, maps/reviews, web archive) only for a market that comes back with
-     nothing, same threshold as that step.
+     nothing, same threshold as that step. For a market in the BC Interior,
+     also check Castanet directly rather than relying on a general web
+     search: its region-specific homepage (`castanet.net/vernon/`, etc. —
+     not the bare `castanet.net/`, which is Kelowna's) and its events page
+     filtered to the market's sub-region and the `CRAFTS/MARKETS` category.
+     For a Shuswap-area market (Salmon Arm, Sicamous, Sorrento, Falkland,
+     Enderby and similar), also check the Salmon Arm Observer directly
+     (`https://saobserver.net/`) and that area's local radio station
+     community calendar (`myshuswapnow.com/community-calendar/`, or search
+     for the equivalent in another town — a written events calendar, not
+     the station's on-air schedule).
    - **Facebook groups, read-only, public only.** When a market has no
      `facebook_page` on file, or its page looks abandoned but the market
      might still run informally, a regional community-marketplace or
