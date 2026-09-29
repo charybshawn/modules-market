@@ -13,8 +13,10 @@ use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Models\MarketSchedule;
 use Cultpantry\Market\Support\MarketEventPresenter;
+use Cultpantry\Market\Support\ScheduleOccurrences;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -59,6 +61,58 @@ class MarketController extends Controller implements HasMiddleware
             'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
+            'livenessLabels' => Market::LIVENESS_LABELS,
+        ]);
+    }
+
+    /**
+     * Month grid of market days, expanded from each schedule's structured
+     * weekdays/times. ?month=YYYY-MM picks the month; region and city narrow
+     * it. The range covers the grid's leading/trailing outside days too.
+     */
+    public function calendar(Request $request): Response
+    {
+        $this->authorize('viewAny', Market::class);
+
+        $filters = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'region' => ['nullable', 'string'],
+            'city' => ['nullable', 'string'],
+        ]);
+
+        $month = isset($filters['month'])
+            ? CarbonImmutable::createFromFormat('Y-m-d', $filters['month'].'-01')->startOfDay()
+            : CarbonImmutable::today()->startOfMonth();
+
+        $schedules = MarketSchedule::with('market')
+            ->whereHas('market', function ($query) use ($filters) {
+                $query->where('is_active', true)
+                    ->when($filters['region'] ?? null, fn ($q, $region) => $q->where('region', $region))
+                    ->when($filters['city'] ?? null, fn ($q, $city) => $q->where('city', $city));
+            })
+            ->get();
+
+        [$placeable, $unplaced] = $schedules->partition(fn (MarketSchedule $s) => $s->isPlaceable());
+
+        return Inertia::render('Vendor/market/Calendar', [
+            'month' => $month->format('Y-m'),
+            'occurrences' => ScheduleOccurrences::between($placeable, $month->subDays(7), $month->endOfMonth()->addDays(14)),
+            // Schedules that can't go on the grid yet (no weekdays set, etc.)
+            // -- listed so they can be fixed from their market page.
+            'unscheduled' => $unplaced
+                ->sortBy(fn (MarketSchedule $s) => $s->market->name)
+                ->map(fn (MarketSchedule $s) => [
+                    'id' => $s->id,
+                    'market_id' => $s->market_id,
+                    'market_name' => $s->market->name,
+                    'city' => $s->market->city,
+                    'label' => $s->label,
+                    'frequency' => $s->frequency,
+                    'frequency_detail' => $s->frequency_detail,
+                ])->values(),
+            'filters' => ['region' => $filters['region'] ?? '', 'city' => $filters['city'] ?? ''],
+            'regions' => Market::REGIONS,
+            'cities' => $this->knownValues('city'),
             'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
     }
@@ -435,6 +489,11 @@ class MarketController extends Controller implements HasMiddleware
             'label' => ['nullable', 'string', 'max:255'],
             'frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
             'frequency_detail' => ['nullable', 'string'],
+            'weekdays' => ['nullable', 'array'],
+            'weekdays.*' => ['integer', 'between:0,6'],
+            'week_of_month' => ['nullable', Rule::in(array_keys(MarketSchedule::WEEKS_OF_MONTH))],
+            'start_time' => ['nullable', 'date_format:H:i'],
+            'end_time' => ['nullable', 'date_format:H:i'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
             'address_line1' => ['nullable', 'string', 'max:255'],

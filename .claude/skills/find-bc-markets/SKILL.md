@@ -184,6 +184,19 @@ matters:
    market with one ordinary schedule just gets one `<schedule>`; a market
    where the research turned up no schedule detail at all gets none.
 
+   **Deep-parse every schedule down to days and times.** The admin calendar
+   places markets using `<weekdays>`, `<week_of_month>`, `<start_time>` and
+   `<end_time>`, not the free-text `<frequency_detail>`. For each schedule,
+   turn the source's wording into those fields: "Saturdays 8:30am-12:30pm"
+   becomes `sat` / `08:30` / `12:30`, and "last Sunday of the month"
+   becomes `monthly` / `sun` / `last`. Keep the original wording in
+   `<frequency_detail>` too. Split a schedule when different days have
+   different hours, or when a monthly market runs on more than one week.
+   Encode only what the source actually states. Follow the rules and
+   worked examples in `references/market-xml-schema.md` → "Deep-parsing
+   schedules". A schedule you couldn't fully structure still gets
+   written; say what's missing in its `<notes>`.
+
 6. **Score liveness before deciding whether to include a market.** A market
    found on a search doesn't mean it still runs — old blog posts and
    directory listings outlive the markets they describe all the time. Score
@@ -386,6 +399,10 @@ matters:
      per steps 6-7 (say what you found and why you left it out).
    - **Changed** — each one named, with what changed (old → new).
    - **Reconfirmed, no change** — just a count; these don't need detail.
+   - **Schedules not fully structured** — any schedule written without
+     `<weekdays>` or times, or a `biweekly` with no anchor date, and why
+     (e.g. "source gives no hours"). These won't show on the calendar
+     until someone fills them in, so list each one.
    - **Not reconfirmed this pass** — markets from the baseline this
      search didn't surface, so the user knows to spot-check them manually
      if they care.

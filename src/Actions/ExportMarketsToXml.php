@@ -84,6 +84,12 @@ class ExportMarketsToXml
         $this->addChild($node, 'label', $schedule->label);
         $this->addChild($node, 'frequency', $schedule->frequency);
         $this->addChild($node, 'frequency_detail', $schedule->frequency_detail);
+        if (! empty($schedule->weekdays)) {
+            $this->addChild($node, 'weekdays', collect($schedule->weekdays)->map(fn (int $d) => MarketSchedule::WEEKDAYS[$d])->implode(','));
+        }
+        $this->addChild($node, 'week_of_month', $schedule->week_of_month === -1 ? 'last' : $schedule->week_of_month);
+        $this->addChild($node, 'start_time', $schedule->start_time);
+        $this->addChild($node, 'end_time', $schedule->end_time);
         $this->addChild($node, 'start_date', $schedule->start_date?->toDateString());
         $this->addChild($node, 'end_date', $schedule->end_date?->toDateString());
         $this->addChild($node, 'address_line1', $schedule->address_line1);

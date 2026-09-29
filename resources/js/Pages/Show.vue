@@ -110,6 +110,7 @@
                       {{ schedule.label ?? 'Schedule' }}
                       <span v-if="schedule.frequency" class="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{{ frequencyLabel(schedule.frequency) }}</span>
                     </div>
+                    <div v-if="recurrenceSummary(schedule)" class="text-sm text-gray-900 dark:text-white">{{ recurrenceSummary(schedule) }}</div>
                     <div v-if="schedule.frequency_detail" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ schedule.frequency_detail }}</div>
                     <div v-if="dateRange(schedule)" class="text-sm text-gray-500 dark:text-gray-400">{{ dateRange(schedule) }}</div>
                     <div v-if="schedule.address_line1" class="text-sm text-gray-500 dark:text-gray-400">At {{ schedule.address_line1 }}</div>
@@ -248,6 +249,7 @@ import MarketEventFilters from './Partials/MarketEventFilters.vue'
 import MarketEventList from './Partials/MarketEventList.vue'
 import MarketEventsDrawer from './Partials/MarketEventsDrawer.vue'
 import ScheduleEditModal from './Partials/ScheduleEditModal.vue'
+import { recurrenceSummary } from './Partials/scheduleSummary'
 import { useMarketEvents, type HistoryConfig } from './Partials/useMarketEvents'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: true }, () => page) })
@@ -257,6 +259,10 @@ interface ScheduleDetail {
   label: string | null
   frequency: string | null
   frequency_detail: string | null
+  weekdays: number[] | null
+  week_of_month: number | null
+  start_time: string | null
+  end_time: string | null
   start_date: string | null
   end_date: string | null
   address_line1: string | null

@@ -2,6 +2,7 @@
 
 namespace Cultpantry\Market\Support;
 
+use Cultpantry\Market\Models\MarketSchedule;
 use Illuminate\Support\Carbon;
 
 /**
@@ -43,6 +44,10 @@ class MarketEventPresenter
         'label' => 'label',
         'frequency' => 'frequency',
         'frequency_detail' => 'days & hours',
+        'weekdays' => 'weekdays',
+        'week_of_month' => 'week of month',
+        'start_time' => 'opens',
+        'end_time' => 'closes',
         'start_date' => 'start date',
         'end_date' => 'end date',
         'address_line1' => 'location',
@@ -105,6 +110,12 @@ class MarketEventPresenter
         }
         if (is_bool($value)) {
             return $value ? 'Yes' : 'No';
+        }
+        if ($field === 'weekdays' && is_array($value)) {
+            return collect($value)->map(fn ($d) => ucfirst(MarketSchedule::WEEKDAYS[$d] ?? (string) $d))->implode(', ') ?: '(empty)';
+        }
+        if ($field === 'week_of_month') {
+            return MarketSchedule::WEEKS_OF_MONTH[$value] ?? (string) $value;
         }
         $text = (string) $value;
         if (str_ends_with($text, ' 00:00:00')) {

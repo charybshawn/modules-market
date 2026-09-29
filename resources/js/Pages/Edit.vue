@@ -206,6 +206,10 @@ interface MarketScheduleDetail {
   label: string | null
   frequency: string | null
   frequency_detail: string | null
+  weekdays: number[] | null
+  week_of_month: number | null
+  start_time: string | null
+  end_time: string | null
   start_date: string | null
   end_date: string | null
   address_line1: string | null
@@ -287,6 +291,10 @@ const form = useForm({
     label: s.label ?? '',
     frequency: s.frequency,
     frequency_detail: s.frequency_detail ?? '',
+    weekdays: [...(s.weekdays ?? [])],
+    week_of_month: s.week_of_month,
+    start_time: s.start_time ?? '',
+    end_time: s.end_time ?? '',
     start_date: s.start_date?.slice(0, 10) ?? '',
     end_date: s.end_date?.slice(0, 10) ?? '',
     address_line1: s.address_line1 ?? '',

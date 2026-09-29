@@ -46,6 +46,15 @@
             Download PDF
           </a>
           <Link
+            :href="route('admin.market.calendar')"
+            class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+          >
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Calendar
+          </Link>
+          <Link
             :href="route('admin.market.create')"
             class="tap-target-touch inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
           >
@@ -118,6 +127,15 @@
             <span class="text-xs font-['Archivo_Black'] uppercase tracking-wide text-amber-500 dark:text-white leading-tight text-center">Download<br>PDF</span>
           </div>
         </div>
+        <Link
+          :href="route('admin.market.calendar')"
+          class="tap-target-touch mt-6 flex items-center justify-center gap-2 rounded-xl bg-white dark:bg-gray-900 py-3 shadow-md dark:shadow-[0_4px_10px_rgba(0,0,0,0.5)] text-xs font-['Archivo_Black'] uppercase tracking-wide text-amber-500 dark:text-white"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Market Calendar
+        </Link>
       </div>
 
       <div v-if="$page.props.flash?.success" class="mb-6 rounded-md bg-green-50 dark:bg-green-900/20 p-4">
@@ -242,7 +260,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
@@ -472,5 +490,9 @@ const handleFileChange = (event: Event) => {
 // filters above have all applied), so the PDF download always matches
 // what's actually on screen rather than the pre-DataTable-filtering `rows`.
 const filteredIds = ref<number[]>([])
-const pdfExportHref = computed(() => route('admin.market.export-pdf', { ids: filteredIds.value.join(',') }))
+// The injected helper, not the global route(): this computed runs during
+// render, and the global only exists in the browser -- server-side
+// rendering has just what ZiggyVue provides.
+const ziggyRoute = inject<typeof route>('route')!
+const pdfExportHref = computed(() => ziggyRoute('admin.market.export-pdf', { ids: filteredIds.value.join(',') }))
 </script>

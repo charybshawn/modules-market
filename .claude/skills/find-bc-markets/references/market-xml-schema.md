@@ -121,12 +121,70 @@ markets will have just one.
 |---|---|
 | `label` | Optional. "Summer Market", "Winter Market", "Christmas Craft Fair". |
 | `frequency` | One of the controlled list above. |
-| `frequency_detail` | Free text — days and hours. |
+| `frequency_detail` | Free text — the source's own wording for days and hours, kept close to verbatim. Still written even when the structured fields below are filled: it carries the nuance they can't ("closed Thanksgiving weekend", "until sold out"). |
+| `weekdays` | Comma-separated day keys: `sun,mon,tue,wed,thu,fri,sat`. The day(s) the market runs. **This is what puts a market on the admin calendar** — see "Deep-parsing schedules" below. Omit for `one_time`. |
+| `week_of_month` | `1`-`4`, or `last`. Only for `frequency` = `monthly` ("2nd Saturday" → `2`, "last Sunday" → `last`). Ignored for any other frequency. |
+| `start_time` / `end_time` | 24-hour `HH:MM` ("8:30am" → `08:30`, "12:30pm" → `12:30`, "5pm" → `17:00`). One pair per schedule. |
 | `start_date` / `end_date` | `YYYY-MM-DD`. Only when the source actually states the year — leave them out rather than guessing one (e.g. a site saying "starts March 23" with no year). |
 | `address_line1` | Only when this schedule is held somewhere other than the market's own address. |
 | `notes` | Anything uncertain about this schedule specifically. |
 | `liveness_score` | **Required.** `0`-`4`, scored per schedule (see SKILL.md step 6). A schedule without a valid one is skipped on import and reported, not imported with a guess. |
 | `liveness_checked_at` | Same rules as on `<market>`: defaults to the import date; leave it out normally. |
+
+## Deep-parsing schedules
+
+The admin calendar places a market on actual days using `weekdays`,
+`week_of_month`, `start_time` and `end_time` — **not** `frequency_detail`,
+which is only displayed. A schedule with no `<weekdays>` (or, for `monthly`,
+no `<week_of_month>`) is imported fine but lands in the calendar's "Not on
+the calendar yet" list. So for every schedule, parse the source's days and
+hours all the way down to these fields, and keep the source's own wording in
+`frequency_detail` alongside them.
+
+Rules:
+
+- **Only encode what the source states.** "Saturday mornings" gives
+  `weekdays` = `sat` but no times. Never infer hours from a typical market
+  or from a different year's listing — leave the element out and say so in
+  the schedule's `<notes>`.
+- **One schedule = one set of weekdays + one opening time + one closing
+  time.** A schedule holds one time pair. If different days have
+  different hours, split them into separate `<schedule>`s with distinct
+  labels, e.g. "Saturday Market" and "Wednesday Evening Market". Days
+  that share the same hours stay together (`<weekdays>sat,sun</weekdays>`).
+- **Monthly with several weeks** ("2nd and 4th Saturday") can't be one
+  schedule, since `week_of_month` holds a single value. Write one `monthly`
+  schedule per week, labelled apart ("Market — 2nd Saturday", "Market —
+  4th Saturday"). "Every other week" is `biweekly`, not two monthlies.
+- **`biweekly` needs an anchor.** The fortnight is counted from
+  `start_date`. If the source gives no dated first market, still write
+  `weekdays` and put "biweekly anchor date unknown" in `<notes>`. The
+  calendar then shows it every week until someone fixes it, so flag it
+  in the summary.
+- **`one_time` uses dates, not weekdays.** `start_date` (and `end_date` for a
+  multi-day fair) with `start_time`/`end_time`. Omit `<weekdays>`.
+- **`seasonal` / `other` still get weekdays.** "Saturdays, May to October"
+  is a `seasonal` (or `weekly`) schedule with `weekdays` = `sat` and the
+  season in `start_date`/`end_date` when the year is stated.
+- **Time words:** "noon" → `12:00`, "midnight" → `00:00`. Fuzzy ends ("until
+  dusk", "until sold out", "till 2ish") get no `end_time`; the wording
+  stays in `frequency_detail`.
+- **Exceptions stay in text.** Skipped dates, holiday closures and "weather
+  permitting" go in `frequency_detail` or `<notes>`. The structured fields
+  describe the normal pattern.
+
+Worked examples:
+
+| Source says | frequency | weekdays | week_of_month | start_time | end_time | dates |
+|---|---|---|---|---|---|---|
+| "Saturdays 8:30am–12:30pm, May 2 – Oct 31, 2026" | `weekly` | `sat` | | `08:30` | `12:30` | `2026-05-02` / `2026-10-31` |
+| "Every Wed 4–7pm and Sat 9–1" | `weekly` ×2 | `wed` / `sat` | | `16:00` / `09:00` | `19:00` / `13:00` | split into two schedules |
+| "Sat & Sun 10am–3pm" | `weekly` | `sat,sun` | | `10:00` | `15:00` | |
+| "First Friday of the month, 5–9pm" | `monthly` | `fri` | `1` | `17:00` | `21:00` | |
+| "Last Sunday monthly, 10 till 2" | `monthly` | `sun` | `last` | `10:00` | `14:00` | |
+| "Every other Thursday from June 4, 2026, 3pm to dusk" | `biweekly` | `thu` | | `15:00` | | `2026-06-04` / — |
+| "Christmas Craft Fair, Dec 5–6 2026, 10–4" | `one_time` | | | `10:00` | `16:00` | `2026-12-05` / `2026-12-06` |
+| "Saturday mornings in summer" | `seasonal` | `sat` | | | | none (no year); note "hours not stated" |
 
 ## Always start with an XML declaration
 
@@ -161,6 +219,9 @@ before handing a file off — it should report `text/xml`, not `text/plain`.
         <label>Summer Market</label>
         <frequency>weekly</frequency>
         <frequency_detail>Saturdays 8:30am-12:30pm</frequency_detail>
+        <weekdays>sat</weekdays>
+        <start_time>08:30</start_time>
+        <end_time>12:30</end_time>
         <start_date>2026-05-02</start_date>
         <end_date>2026-10-31</end_date>
         <liveness_score>4</liveness_score>

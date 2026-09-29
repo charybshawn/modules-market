@@ -68,6 +68,10 @@ export interface ScheduleDetail {
   label: string | null
   frequency: string | null
   frequency_detail: string | null
+  weekdays: number[] | null
+  week_of_month: number | null
+  start_time: string | null
+  end_time: string | null
   start_date: string | null
   end_date: string | null
   address_line1: string | null
@@ -92,6 +96,10 @@ const form = useForm<ScheduleForm>({
   label: '',
   frequency: null,
   frequency_detail: '',
+  weekdays: [],
+  week_of_month: null,
+  start_time: '',
+  end_time: '',
   start_date: '',
   end_date: '',
   address_line1: '',
@@ -114,6 +122,10 @@ watch(
       label: schedule.label ?? '',
       frequency: schedule.frequency,
       frequency_detail: schedule.frequency_detail ?? '',
+      weekdays: [...(schedule.weekdays ?? [])],
+      week_of_month: schedule.week_of_month,
+      start_time: schedule.start_time ?? '',
+      end_time: schedule.end_time ?? '',
       start_date: toDateInput(schedule.start_date),
       end_date: toDateInput(schedule.end_date),
       address_line1: schedule.address_line1 ?? '',

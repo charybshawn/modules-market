@@ -4,6 +4,7 @@ namespace Cultpantry\Market\Actions;
 
 use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
+use Cultpantry\Market\Models\MarketSchedule;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -202,10 +203,17 @@ class ImportMarketsFromXml
                 continue;
             }
 
+            $frequency = $this->frequency($schedule);
             $schedules[] = [
                 'label' => $this->text($schedule, 'label'),
-                'frequency' => $this->frequency($schedule),
+                'frequency' => $frequency,
                 'frequency_detail' => $this->text($schedule, 'frequency_detail'),
+                'weekdays' => $this->weekdays($schedule),
+                // Mirrors MarketSchedule's saving hook, so the unchanged
+                // check below compares like with like.
+                'week_of_month' => $frequency === 'monthly' ? $this->weekOfMonth($schedule) : null,
+                'start_time' => $this->time($schedule, 'start_time'),
+                'end_time' => $this->time($schedule, 'end_time'),
                 'start_date' => $this->date($schedule, 'start_date'),
                 'end_date' => $this->date($schedule, 'end_date'),
                 'address_line1' => $this->text($schedule, 'address_line1'),
@@ -216,6 +224,71 @@ class ImportMarketsFromXml
         }
 
         return $schedules;
+    }
+
+    /**
+     * <weekdays>sat,sun</weekdays> -- comma/space separated, and lenient
+     * about spelling ("Sat", "saturday", "Saturdays") or plain 0-6 numbers
+     * (0 = Sunday). Unrecognized tokens are dropped; sorted unique ints,
+     * or null when nothing usable was given, same as the model stores it.
+     *
+     * @return array<int, int>|null
+     */
+    private function weekdays(SimpleXMLElement $node): ?array
+    {
+        $value = $this->text($node, 'weekdays');
+        if ($value === null) {
+            return null;
+        }
+
+        $days = [];
+        foreach (preg_split('/[\s,;\/]+/', strtolower($value), -1, PREG_SPLIT_NO_EMPTY) as $token) {
+            if (ctype_digit($token) && (int) $token <= 6) {
+                $days[] = (int) $token;
+                continue;
+            }
+            $day = array_search(substr($token, 0, 3), MarketSchedule::WEEKDAYS, true);
+            if ($day !== false) {
+                $days[] = $day;
+            }
+        }
+
+        $days = array_values(array_unique($days));
+        sort($days);
+
+        return $days === [] ? null : $days;
+    }
+
+    /**
+     * 1-4 for the Nth weekday of the month, -1 (or "last") for the last.
+     */
+    private function weekOfMonth(SimpleXMLElement $node): ?int
+    {
+        $value = strtolower((string) $this->text($node, 'week_of_month'));
+        if ($value === 'last') {
+            return -1;
+        }
+        $value = (int) $value;
+
+        return array_key_exists($value, MarketSchedule::WEEKS_OF_MONTH) ? $value : null;
+    }
+
+    /**
+     * Accepts "08:30", "17:00" or "8:30am" / "5pm"; stored as H:i. Anything
+     * unparseable is treated as absent, like date() below.
+     */
+    private function time(SimpleXMLElement $node, string $child): ?string
+    {
+        $value = $this->text($node, $child);
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->format('H:i');
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**

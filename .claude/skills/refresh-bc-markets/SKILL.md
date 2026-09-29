@@ -39,6 +39,32 @@ case that safely leaves existing schedules alone, but including the block at
 all replaces the whole set, so a partial or reconstructed-from-memory
 schedule list would quietly drop real data.
 
+The baseline JSON returns `weekdays` as integers (`0` = Sunday … `6` =
+Saturday) and times as `HH:MM`. Write them back as the XML expects:
+`<weekdays>sat,sun</weekdays>`, `<week_of_month>` as `1`-`4` or `last`, and
+times unchanged. Carrying a schedule forward means carrying these
+structured fields forward too. Dropping them would take the market off the
+calendar.
+
+## Backfilling schedule structure
+
+Many schedules predate the structured day/time fields. They have only
+free-text `frequency_detail` and null `weekdays`/`start_time`/`end_time`,
+so they don't appear on the admin calendar. **On every market you touch,
+deep-parse any schedule that's missing that structure.** Use the rules and
+worked examples in `find-bc-markets/references/market-xml-schema.md` →
+"Deep-parsing schedules". Parse from the current source you just checked
+when there is one, or from the baseline `frequency_detail` when the
+schedule is reconfirmed unchanged.
+
+Split a schedule when the rules call for it. For example, a
+"Wed 4-7, Sat 9-1" row becomes two schedules. Splitting replaces the
+original row, so keep its label on one of the halves where it still fits.
+Report backfills as their own group in the summary ("Structure added: N
+schedules"), separate from real schedule changes. Name anything you could
+only partly structure (no hours stated, biweekly with no anchor date) so
+the user can fill it in by hand.
+
 ## Workflow
 
 1. **Pull the full baseline.** Every market, every column, every schedule --
@@ -155,7 +181,9 @@ schedule list would quietly drop real data.
      advances to today -- that's what makes the next refresh's staleness
      ordering meaningful. Roll-up count only in the summary.
    - **Changed.** A field genuinely differs, or the score moved by more
-     than 1 point, or a schedule changed. Carry the baseline forward and
+     than 1 point, or a schedule changed. (Only adding day/time structure
+     to a schedule whose schedule itself didn't change counts as "Structure
+     added", not "Changed". See "Backfilling schedule structure" above.) Carry the baseline forward and
      overwrite just what changed. Name it in the summary, old → new.
    - **Newly defunct.** Score drops to 1 or below, or something explicitly
      says closed. Still write the entry (carrying every other field
@@ -176,7 +204,9 @@ schedule list would quietly drop real data.
    `refresh-<scope-or-date>-<YYYY-MM-DD>.xml`) and its emphasis on flagging
    uncertainty rather than resolving it. Structure the summary around the
    classifications in step 5 above rather than step 9's "New markets found"
-   framing, since nothing here is new. **Don't import the file yourself.**
+   framing, since nothing here is new. Include a "Structure added"
+   group: the count of schedules backfilled with days/times, plus a named
+   list of any that are only partly structured. **Don't import the file yourself.**
 
 ## A note on scale and pacing
 
