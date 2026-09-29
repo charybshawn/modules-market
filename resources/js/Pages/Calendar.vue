@@ -38,15 +38,15 @@
       <div class="rounded-lg bg-white dark:bg-gray-800 shadow overflow-hidden">
         <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
           <div class="flex items-center gap-1">
-            <button type="button" :class="navButtonClass" aria-label="Previous month" @click="shiftMonth(-1)">
+            <IconButton label="Previous month" :class="navButtonClass" @click="shiftMonth(-1)">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-            </button>
-            <button type="button" :class="navButtonClass" aria-label="Next month" @click="shiftMonth(1)">
+            </IconButton>
+            <IconButton label="Next month" :class="navButtonClass" @click="shiftMonth(1)">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-            </button>
+            </IconButton>
             <h2 class="ml-2 text-base font-semibold text-gray-900 dark:text-white" aria-live="polite">{{ monthTitle }}</h2>
           </div>
-          <button type="button" :class="[navButtonClass, 'px-3 text-sm font-medium']" @click="goToday">Today</button>
+          <button type="button" :class="[navButtonClass, 'tap-target-touch h-9 px-3 text-sm font-medium']" @click="goToday">Today</button>
         </div>
 
         <!-- Vuetify's own theme follows the admin's class-based dark mode. -->
@@ -61,9 +61,7 @@
             event-more
             event-more-text="+{0} more"
             :class="['market-calendar', { 'opacity-60 transition-opacity': loading }]"
-            @click:event="openEvent"
-            @click:date="openDay"
-            @click:more="openDay"
+            @click:day="openDay"
           />
         </v-theme-provider>
       </div>
@@ -95,24 +93,14 @@
         </ul>
       </section>
 
-      <ResponsiveModal :show="selectedDay !== null" max-width="md" @close="selectedDay = null">
-        <div v-if="selectedDay" class="p-6 max-md:px-4 max-md:pt-0">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ dayHeading }}</h2>
-          <p v-if="dayRows.length === 0" class="mt-3 text-sm text-gray-500 dark:text-gray-400">No markets on this day.</p>
-          <ul v-else class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
-            <li v-for="row in dayRows" :key="row.id">
-              <Link :href="route('admin.market.show', row.market_id)" class="tap-target-touch flex items-start gap-3 py-3">
-                <span class="mt-1.5 w-2.5 h-2.5 shrink-0 rounded-full" :style="{ backgroundColor: livenessHex(row.liveness_score) }" :title="livenessLabels[row.liveness_score]"></span>
-                <span class="min-w-0">
-                  <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ row.market_name }}<span v-if="row.label" class="font-normal text-gray-500 dark:text-gray-400"> · {{ row.label }}</span></span>
-                  <span class="block text-sm text-gray-700 dark:text-gray-300">{{ formatHours(row.start_time, row.end_time) || 'Hours not set' }}</span>
-                  <span class="block text-xs text-gray-500 dark:text-gray-400">{{ [row.address, row.city].filter(Boolean).join(', ') }}</span>
-                </span>
-              </Link>
-            </li>
-          </ul>
-        </div>
-      </ResponsiveModal>
+      <MarketDayModal
+        :date="selectedDay"
+        :occurrences="occurrences"
+        :liveness-labels="livenessLabels"
+        :loading="loading"
+        @close="selectedDay = null"
+        @navigate="goToDay"
+      />
     </div>
   </div>
 </template>
@@ -134,26 +122,13 @@ import { VThemeProvider } from 'vuetify/components/VThemeProvider'
 import 'vuetify/styles/core'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
-import ResponsiveModal from '@/Components/ResponsiveModal.vue'
-import { formatHours, formatTime } from './Partials/scheduleSummary'
+import IconButton from '@/Components/IconButton.vue'
+import MarketDayModal, { type MarketDayOccurrence } from './Partials/MarketDayModal.vue'
+import { formatTime } from './Partials/scheduleSummary'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
 
-interface Occurrence {
-  id: string
-  schedule_id: number
-  market_id: number
-  market_name: string
-  city: string | null
-  region: string | null
-  label: string | null
-  date: string
-  start_time: string | null
-  end_time: string | null
-  frequency_detail: string | null
-  address: string | null
-  liveness_score: number
-}
+type Occurrence = MarketDayOccurrence
 
 interface UnscheduledRow {
   id: number
@@ -176,7 +151,7 @@ const props = defineProps<{
 }>()
 
 const selectClass = 'mt-1 block w-full md:w-48 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm'
-const navButtonClass = 'tap-target-touch inline-flex items-center justify-center h-9 min-w-[2.25rem] rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+const navButtonClass = 'inline-flex items-center justify-center rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
 
 // "YYYY-MM-DD" parsed as a local date, so a timezone offset can't shift the day.
 const localDate = (ymd: string) => {
@@ -254,20 +229,20 @@ watch(focusMonth, (month) => {
 })
 watch(filters, reload, { deep: true })
 
-// VCalendar calls every handler as (nativeEvent, data).
-const openEvent = (_e: Event, { event }: { event: CalendarEntry }) => {
-  router.visit(route('admin.market.show', occurrenceOf(event).market_id))
-}
-
-// Day list: the date number or "+N more" (and the main way to browse on a phone).
+// Any click inside a day -- its date, a market chip, "+N more", or the empty
+// cell -- bubbles up to VCalendar's click:day and opens that day's schedule;
+// each market in it links to the market itself. (VCalendar calls every
+// handler as (nativeEvent, data).)
 const selectedDay = ref<string | null>(null)
 const openDay = (_e: Event, day: { date: string }) => {
   selectedDay.value = day.date
 }
-const dayRows = computed(() => props.occurrences.filter((o) => o.date === selectedDay.value))
-const dayHeading = computed(() =>
-  selectedDay.value ? localDate(selectedDay.value).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : '',
-)
+// Stepping days in the modal: moving the calendar's focus to that day loads
+// its month when the step crosses into another one.
+const goToDay = (date: string) => {
+  selectedDay.value = date
+  focus.value = date
+}
 
 // Follow the admin's own class-based dark mode.
 const isDark = ref(false)
@@ -283,3 +258,12 @@ onBeforeUnmount(() => observer?.disconnect())
 const showUnscheduled = ref(false)
 </script>
 
+<style scoped>
+/* Whole day cells open that day's schedule, so they should read as clickable. */
+.market-calendar :deep(.v-calendar-weekly__day) {
+  cursor: pointer;
+}
+.market-calendar :deep(.v-calendar-weekly__day:hover) {
+  background-color: rgb(99 102 241 / 0.06);
+}
+</style>
