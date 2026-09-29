@@ -2,6 +2,8 @@
 
 namespace Cultpantry\Market\Models;
 
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -122,6 +124,28 @@ class MarketSchedule extends Model
         }
 
         return $this->frequency !== 'monthly' || $this->week_of_month !== null;
+    }
+
+    /**
+     * Seasons that touch [$from, $to]; an open start or end counts as
+     * touching. Compared as full datetimes so a date column stored as
+     * "Y-m-d 00:00:00" (SQLite) still matches its own last day.
+     */
+    public function scopeOverlapping(Builder $query, CarbonInterface $from, CarbonInterface $to): void
+    {
+        $query->where(fn (Builder $q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $to->endOfDay()->toDateTimeString()))
+            ->where(fn (Builder $q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $from->startOfDay()->toDateTimeString()));
+    }
+
+    /**
+     * Rows that might fail isPlaceable() -- a superset, narrowed in SQL
+     * before isPlaceable() makes the actual call.
+     */
+    public function scopeMissingPlacement(Builder $query): void
+    {
+        $query->where(fn (Builder $q) => $q->whereNull('weekdays')
+            ->orWhere(fn (Builder $q) => $q->where('frequency', 'monthly')->whereNull('week_of_month'))
+            ->orWhere(fn (Builder $q) => $q->where('frequency', 'one_time')->whereNull('start_date')));
     }
 
     public function market(): BelongsTo

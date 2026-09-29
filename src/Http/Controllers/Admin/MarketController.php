@@ -84,19 +84,37 @@ class MarketController extends Controller implements HasMiddleware
             ? CarbonImmutable::createFromFormat('Y-m-d', $filters['month'].'-01')->startOfDay()
             : CarbonImmutable::today()->startOfMonth();
 
-        $schedules = MarketSchedule::with('market')
-            ->whereHas('market', function ($query) use ($filters) {
-                $query->where('is_active', true)
-                    ->when($filters['region'] ?? null, fn ($q, $region) => $q->where('region', $region))
-                    ->when($filters['city'] ?? null, fn ($q, $city) => $q->where('city', $city));
-            })
-            ->get();
+        // The grid's range, including its leading/trailing outside days.
+        $from = $month->subDays(7);
+        $to = $month->endOfMonth()->addDays(14);
 
-        [$placeable, $unplaced] = $schedules->partition(fn (MarketSchedule $s) => $s->isPlaceable());
+        $activeMarkets = function ($query) use ($filters) {
+            $query->where('is_active', true)
+                ->when($filters['region'] ?? null, fn ($q, $region) => $q->where('region', $region))
+                ->when($filters['city'] ?? null, fn ($q, $city) => $q->where('city', $city));
+        };
+
+        // Only schedules whose season touches this range get expanded, so
+        // past seasons and old one-off events cost nothing.
+        $inSeason = MarketSchedule::with('market')
+            ->whereHas('market', $activeMarkets)
+            ->overlapping($from, $to)
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (MarketSchedule $s) => $s->isPlaceable());
+
+        // missingPlacement() is a coarse SQL pre-filter; isPlaceable() stays
+        // the single definition of "can go on the grid".
+        $unplaced = MarketSchedule::with('market')
+            ->whereHas('market', $activeMarkets)
+            ->missingPlacement()
+            ->orderBy('id')
+            ->get()
+            ->reject(fn (MarketSchedule $s) => $s->isPlaceable());
 
         return Inertia::render('Vendor/market/Calendar', [
             'month' => $month->format('Y-m'),
-            'occurrences' => ScheduleOccurrences::between($placeable, $month->subDays(7), $month->endOfMonth()->addDays(14)),
+            'occurrences' => ScheduleOccurrences::between($inSeason, $from, $to),
             // Schedules that can't go on the grid yet (no weekdays set, etc.)
             // -- listed so they can be fixed from their market page.
             'unscheduled' => $unplaced
