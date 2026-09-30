@@ -911,6 +911,7 @@
     {"name": "Kung", "lat": 54.05, "lng": -132.5706, "pop": 0},
     {"name": "Kuskonook", "lat": 49.3003, "lng": -116.6614, "pop": 0},
     {"name": "Kyuquot", "lat": 50.0303, "lng": -127.3779, "pop": 0},
+    {"name": "Lac La Hache", "lat": 51.8177, "lng": -121.4677, "pop": 0, "aliases": ["Lac la Hache"], "manual": true},
     {"name": "Lac Le Jeune", "lat": 50.4831, "lng": -120.5025, "pop": 0},
     {"name": "Ladner", "lat": 49.0894, "lng": -123.0824, "pop": 23016},
     {"name": "Ladysmith", "lat": 48.9902, "lng": -123.817, "pop": 8537},

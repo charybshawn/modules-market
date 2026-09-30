@@ -20,9 +20,7 @@ Cariboo Chilcotin Coast
 Fraser Valley
 Kootenay Rockies
 Metro Vancouver
-Nechako
-North Coast
-Northern Rockies
+Northern BC
 Okanagan
 Sea to Sky
 Shuswap
@@ -32,6 +30,12 @@ Thompson
 Thompson Okanagan
 Vancouver Island
 ```
+
+"Northern BC" is deliberately one value for the whole north (Prince George,
+the Peace, the northwest and the north coast): it's a huge, thinly populated
+area with few markets, so it isn't split further. The older Nechako, North
+Coast and Northern Rockies values are retired; an import of an old file still
+accepts them and files them under Northern BC.
 
 These are a blend of Destination BC's 6 official tourism regions and
 well-known named sub-areas (Okanagan, Shuswap, Similkameen, Thompson) split

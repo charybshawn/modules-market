@@ -385,9 +385,9 @@ class ImportMarketsFromXml
             return null;
         }
 
-        foreach (Market::REGIONS as $region) {
+        foreach ([...Market::REGIONS, ...array_keys(Market::RETIRED_REGIONS)] as $region) {
             if (strcasecmp($region, $value) === 0) {
-                return $region;
+                return Market::RETIRED_REGIONS[$region] ?? $region;
             }
         }
 

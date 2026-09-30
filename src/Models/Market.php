@@ -59,6 +59,11 @@ class Market extends Model
      * to locally far more often than the broad "Thompson Okanagan" region
      * they technically sit inside. Shared with the Vue form's <select> and
      * the filter dropdown the same way FREQUENCIES is.
+     *
+     * The north is a single "Northern BC": it spans a huge area with few
+     * people and few markets, so splitting it into Nechako, North Coast and
+     * Northern Rockies left each nearly empty and put Prince George in none
+     * of them (see RETIRED_REGIONS).
      */
     public const REGIONS = [
         'Boundary',
@@ -66,9 +71,7 @@ class Market extends Model
         'Fraser Valley',
         'Kootenay Rockies',
         'Metro Vancouver',
-        'Nechako',
-        'North Coast',
-        'Northern Rockies',
+        'Northern BC',
         'Okanagan',
         'Sea to Sky',
         'Shuswap',
@@ -77,6 +80,16 @@ class Market extends Model
         'Thompson',
         'Thompson Okanagan',
         'Vancouver Island',
+    ];
+
+    /**
+     * Regions that used to be in REGIONS and are now part of another one, so
+     * an old XML file or a stored record still lands in the right place.
+     */
+    public const RETIRED_REGIONS = [
+        'Nechako' => 'Northern BC',
+        'North Coast' => 'Northern BC',
+        'Northern Rockies' => 'Northern BC',
     ];
 
     /**
