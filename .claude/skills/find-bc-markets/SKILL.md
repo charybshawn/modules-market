@@ -48,20 +48,17 @@ matters:
    researching all of BC at once produces a shallow, low-confidence result
    for a task that's much better done a region at a time.
 
-2. **Look up what's already in the database for this scope.** This is what
+2. **Look up what's already on file for this scope.** This is what
    makes a repeat run (e.g. a weekly re-check) produce a diff instead of just
-   re-reporting the same markets from scratch. Query the live
-   `market_markets` table read-only, from the cultpantry app:
+   re-reporting the same markets from scratch. **Follow
+   `references/getting-the-baseline.md`**: ask for the admin panel's Export
+   XML file (preferred: it's production's data and works on any machine),
+   or fall back to a local cultpantry checkout.
 
-   ```
-   cd /Users/shawn/Documents/code/cultpantry && php artisan tinker --execute="echo \Cultpantry\Market\Models\Market::with('schedules')->where('city', '<city>')->orWhere('region', '<region>')->get()->toJson();"
-   ```
-
-   Match on whichever of city/region the user gave in step 1 (use just one
-   `where` if only one applies). Pull every column (no `get([...])` field
-   list) rather than just the liveness-relevant ones — you need the full row
-   on hand, not just enough to score it, because of the carry-forward rule
-   below. Keep this baseline list in mind through the rest of the research —
+   Keep the entries whose city or region matches the scope from step 1.
+   Keep every field of each, not just the liveness-relevant ones — you need
+   the full entry on hand, not just enough to score it, because of the
+   carry-forward rule below. Keep this baseline list in mind through the rest of the research —
    step 6 compares fresh findings against it, and step 9 reports the diff.
    This step only reads; nothing about it writes to the database, so it's
    safe to run every time, including the very first run for a new scope
@@ -197,10 +194,19 @@ matters:
    schedules". A schedule you couldn't fully structure still gets
    written; say what's missing in its `<notes>`.
 
-6. **Score liveness before deciding whether to include a market.** A market
-   found on a search doesn't mean it still runs — old blog posts and
+6. **Screen it as an independent-vendor market, then score liveness before
+   deciding whether to include it.** These are two separate questions —
+   whether it's the *kind* of thing this module tracks at all, and whether
+   it's currently active — so do them in that order. **Read
+   `references/vendor-market-screen.md` and run its decision rule on every
+   candidate first**: some "market"-branded listings turn out to be a single
+   business's storefront, retail sale, or pop-up shop rather than an
+   independent-vendor market, and those get excluded (or flagged, if
+   genuinely ambiguous) regardless of how active they are. A market found on
+   a search doesn't mean it still runs, either — old blog posts and
    directory listings outlive the markets they describe all the time. Score
-   each market against these four checks, one point each:
+   each market that passes the screen against these four checks, one point
+   each:
 
    - **Recent activity, in season.** Its Facebook or Instagram page (or site) has a post
      within roughly the last 12 months, OR it's currently off-season for
@@ -419,6 +425,11 @@ matters:
    panel's Import XML button, reviewing the file first.
 
 ## One-time, pop-up and past-event markets
+
+(For the place-less version of this — "see what's new on social media" with
+no city or region named — use `scan-bc-market-socials` instead, which runs
+this same sourcing across a chosen scope's worth of towns rather than one
+named place.)
 
 Recurring weekly markets are easy to find; the one-off ones — holiday markets,
 craft fairs, harvest and Halloween markets, street festivals — mostly live in

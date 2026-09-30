@@ -1,8 +1,8 @@
 # Market XML schema
 
 Source of truth for everything on this page: `Cultpantry\Market\Models\Market` and
-`Cultpantry\Market\Actions\ImportMarketsFromXml` in
-`/Users/shawn/Documents/code/modules-market/src/`. If the Laravel side ever
+`Cultpantry\Market\Actions\ImportMarketsFromXml` in this repo's `src/`
+(the `modules-market` root, two levels above this skill's folder). If the Laravel side ever
 changes these lists, this file needs to change with it — check that repo if
 something here looks stale.
 

@@ -5,12 +5,12 @@ description: Re-checks markets ALREADY in the cultpantry Farmer's Markets admin 
 
 # Refresh BC Markets
 
-Pulls the full list of markets already in the `market_markets` table and
+Pulls the full list of markets already on file and
 re-verifies each one against current sources, producing an XML file for the
 Import XML feature that updates what changed and leaves everything else
 alone. This is the maintenance counterpart to `find-bc-markets`: that skill
 discovers new markets for a place the user names; this one starts from the
-database itself and asks "is what's on file still true?"
+current market list and asks "is what's on file still true?"
 
 Like `find-bc-markets`, this is a research aid, not an importer -- it never
 touches the database. The user reviews the XML and imports it by hand.
@@ -24,7 +24,7 @@ real, currently-accurate records.
 
 ## The one rule that matters most here
 
-**Every entry you write starts from that market's own current database row,
+**Every entry you write starts from that market's own current baseline entry,
 with every field carried forward unchanged, and you overwrite only the
 specific fields you found new information for.** Never rebuild an entry
 from scratch using only what this pass happened to turn up. A market you
@@ -39,12 +39,12 @@ case that safely leaves existing schedules alone, but including the block at
 all replaces the whole set, so a partial or reconstructed-from-memory
 schedule list would quietly drop real data.
 
-The baseline JSON returns `weekdays` as integers (`0` = Sunday … `6` =
-Saturday) and times as `HH:MM`. Write them back as the XML expects:
-`<weekdays>sat,sun</weekdays>`, `<week_of_month>` as `1`-`4` or `last`, and
-times unchanged. Carrying a schedule forward means carrying these
-structured fields forward too. Dropping them would take the market off the
-calendar.
+From the Export XML baseline, carrying an entry forward is literally
+copying its `<market>` element and editing only what changed. That
+includes each schedule's `<weekdays>`, `<week_of_month>`, `<start_time>`
+and `<end_time>`. Dropping them would take the market off the calendar.
+(If the baseline came from the tinker fallback instead, convert its JSON as
+the table in `getting-the-baseline.md` shows.)
 
 ## Backfilling schedule structure
 
@@ -67,17 +67,15 @@ the user can fill it in by hand.
 
 ## Workflow
 
-1. **Pull the full baseline.** Every market, every column, every schedule --
-   this is the source of truth you'll carry forward and diff against, so
-   don't scope the query down to a subset of fields:
+1. **Get the full baseline.** Every market, every field, every schedule --
+   this is the source of truth you'll carry forward and diff against. **Follow
+   `../find-bc-markets/references/getting-the-baseline.md`**: ask for the
+   admin panel's Export XML file (preferred: it's production's data and
+   works on any machine), or fall back to a local cultpantry checkout.
 
-   ```
-   cd /Users/shawn/Documents/code/cultpantry && php artisan tinker --execute="echo \Cultpantry\Market\Models\Market::with('schedules')->orderBy('liveness_checked_at')->get()->toJson();"
-   ```
-
-   Ordering by `liveness_checked_at` (nulls and oldest first) is what makes
-   step 2's prioritization straightforward -- the markets most overdue for a
-   look come back first.
+   Sort it by `liveness_checked_at`, missing dates first, then oldest
+   first. That ordering is what makes step 2's prioritization
+   straightforward -- the markets most overdue for a look come first.
 
 2. **Scope the run.** Checking every market across four platforms in one
    pass doesn't hold up the same way `find-bc-markets`' per-region searches
@@ -96,7 +94,8 @@ the user can fill it in by hand.
      with the next batch?`) rather than silently stopping or silently
      continuing through all of them. Let the user decide whether to keep
      going now or pick it up later.
-   - `is_active = false` markets (already deactivated, liveness 0-1) are
+   - Inactive markets (liveness 0-1; the export has no `is_active`, see
+     `getting-the-baseline.md`) are
      included by default but check them last and more lightly -- a couple of
      searches, not a full multi-platform pass -- since a market already
      marked defunct re-activating is a real but rare event, not something
@@ -160,12 +159,21 @@ the user can fill it in by hand.
      database column for it (fold anything genuinely found into `<notes>`
      or `<sources>`, not a field that doesn't exist).
 
-4. **Score liveness with the same rubric as `find-bc-markets`.** Apply its
-   step 6 four-point check (recent in-season activity, current-year
-   confirmation, live website, corroboration) and its step 7 second-pass
-   escalation for anything landing at 2 or below -- don't reinvent or loosen
-   the rubric here; read that skill's SKILL.md for the full version if it's
-   not already in context. The one addition specific to a refresh pass:
+4. **Screen for a vendor-market drift, then score liveness with the same
+   rubric as `find-bc-markets`.** A market already on file already passed
+   the independent-vendor-market bar once, so this isn't the "brand-new
+   candidate" case -- but a market's own format can change over the years
+   you're not looking. If what you read this pass suggests it's drifted
+   toward storefront-only (vendor booths dropped, posts now only about
+   in-store retail), run `../find-bc-markets/references/vendor-market-screen.md`'s
+   decision rule and follow its "Re-checking a market already on file"
+   section rather than silently rescoring it as if nothing changed. Then
+   apply `find-bc-markets`' step 6 four-point check (recent in-season
+   activity, current-year confirmation, live website, corroboration) and its
+   step 7 second-pass escalation for anything landing at 2 or below -- don't
+   reinvent or loosen the rubric here; read that skill's SKILL.md for the
+   full version if it's not already in context. The one addition specific to
+   a refresh pass:
    since every market here already has a *previous* score and
    `liveness_checked_at` date on file, the comparison in step 6's
    "Unchanged / Changed" classification is the whole point of this skill,
@@ -190,13 +198,18 @@ the user can fill it in by hand.
      forward) with the new score -- the import marks it inactive
      automatically. Call this out clearly in the summary; it's the single
      most actionable finding a refresh pass can produce.
-   - **Came back.** An already-`is_active = false` market shows real current
+   - **Came back.** An already-inactive (liveness 0-1) market shows real current
      activity. Write it with the higher score and say so plainly -- the
      import doesn't auto-reactivate anything below `DEACTIVATE_AT_OR_BELOW`
      on its own the other direction, but a clear positive score change is
      exactly what should prompt the user to flip it back on by hand.
    - **Not reached this pass.** Any market outside this run's batch (step
      2) -- list them, don't imply they were checked.
+   - **Possibly no longer a vendor market.** Flagged by step 4's screen.
+     Write the entry as usual (carry-forward rule applies same as any other
+     case) with the `Vendor-market check:` note appended to `<notes>`, and
+     call it out by name in the summary so the user decides whether it still
+     belongs in the module -- don't deactivate or remove it yourself.
 
 6. **Write the XML and report as a diff**, exactly following
    `find-bc-markets` step 9's format and file location
