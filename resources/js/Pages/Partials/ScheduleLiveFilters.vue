@@ -1,8 +1,7 @@
 <template>
   <div class="space-y-5">
-    <div>
-      <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Frequency</h3>
-      <div class="mt-2 flex flex-wrap gap-2">
+    <FilterSection title="Frequency" :summary="frequencySummary">
+      <div class="flex flex-wrap gap-2">
         <button
           v-for="(label, key) in frequencies"
           :key="key"
@@ -13,11 +12,10 @@
         >{{ freqStates[key] === 'exclude' ? 'Not ' : '' }}{{ label }}</button>
       </div>
       <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Click once to include, again to exclude, a third time to clear.</p>
-    </div>
+    </FilterSection>
 
-    <div>
-      <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Occurring in</h3>
-      <div class="mt-2 flex flex-wrap gap-2">
+    <FilterSection title="Occurring in" :summary="monthsSummary">
+      <div class="flex flex-wrap gap-2">
         <button
           v-for="(name, i) in MONTHS"
           :key="name"
@@ -28,7 +26,7 @@
         >{{ name }}</button>
       </div>
       <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Any year, so last year's edition counts for next year. Schedules without dates never match a month.</p>
-    </div>
+    </FilterSection>
 
     <div v-if="includesFrequency && months.length" class="flex flex-wrap items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
       <span>Show schedules that match</span>
@@ -45,12 +43,8 @@
       </span>
     </div>
 
-    <div>
-      <div class="flex items-baseline justify-between">
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Liveness</h3>
-        <span class="text-sm text-gray-700 dark:text-gray-300">{{ livenessMin }}/4 &ndash; {{ livenessMax }}/4</span>
-      </div>
-      <div class="relative mt-2 h-6">
+    <FilterSection title="Liveness" :summary="livenessNarrowed ? `${livenessMin}/4 – ${livenessMax}/4` : ''">
+      <div class="relative h-6">
         <div class="absolute inset-x-[9px] top-1/2 h-1 -translate-y-1/2 rounded-full bg-gray-200 dark:bg-gray-600">
           <div
             class="absolute h-1 rounded-full bg-indigo-500"
@@ -84,7 +78,7 @@
       <p v-if="livenessNarrowed && livenessMin <= 1" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
         Markets scoring 1 or below are marked inactive &mdash; also tick Inactive under Status to see them.
       </p>
-    </div>
+    </FilterSection>
 
     <button
       v-if="customFilterCount"
@@ -97,11 +91,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import FilterSection from '@/Components/Admin/FilterSection.vue'
 
 // The state lives in the page (it drives which rows show); this component is
 // only the controls, so the Filters dropdown and the toolbar popover can both
 // render it and never disagree.
-defineProps<{
+const props = defineProps<{
   frequencies: Record<string, string>
   customFilterCount: number
 }>()
@@ -115,6 +110,17 @@ const livenessMax = defineModel<number>('livenessMax', { required: true })
 const includeUnchecked = defineModel<boolean>('includeUnchecked', { required: true })
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// What is set, for the header of a section that is closed.
+const frequencySummary = computed(() =>
+  Object.entries(freqStates.value)
+    .map(([key, state]) => `${state === 'exclude' ? 'Not ' : ''}${props.frequencies[key] ?? key}`)
+    .join(', '),
+)
+const monthsSummary = computed(() => {
+  const names = [...months.value].sort((a, b) => a - b).map((m) => MONTHS[m - 1])
+  return names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', ')
+})
 
 const includesFrequency = computed(() => Object.values(freqStates.value).includes('include'))
 const livenessNarrowed = computed(() => livenessMin.value > 0 || livenessMax.value < 4)

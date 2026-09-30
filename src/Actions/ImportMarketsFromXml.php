@@ -29,7 +29,7 @@ use SimpleXMLElement;
 class ImportMarketsFromXml
 {
     /**
-     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int}
+     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>}
      */
     public function handle(UploadedFile $file): array
     {
@@ -50,6 +50,7 @@ class ImportMarketsFromXml
         $scheduleCount = 0;
         $schedulesSkipped = 0;
         $deactivated = 0;
+        $unknownTowns = [];
 
         foreach ($xml->market as $node) {
             $name = $this->text($node, 'name');
@@ -106,6 +107,12 @@ class ImportMarketsFromXml
 
             $market->save();
 
+            // A city the places file has no point for: the market imports fine
+            // but can't be found by a distance search.
+            if ($market->locationStatus() === 'unknown_town') {
+                $unknownTowns[$market->city] = $market->city;
+            }
+
             if ($wasActive && $market->is_active === false) {
                 $deactivated++;
             }
@@ -154,6 +161,7 @@ class ImportMarketsFromXml
             'schedules' => $scheduleCount,
             'schedules_skipped' => $schedulesSkipped,
             'deactivated' => $deactivated,
+            'unknown_towns' => array_values($unknownTowns),
         ];
     }
 

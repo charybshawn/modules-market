@@ -29,6 +29,12 @@ class MarketResource extends JsonResource
             'is_active' => (bool) $this->is_active,
             'liveness_score' => $this->liveness_score,
             'liveness_checked_at' => $this->liveness_checked_at?->toDateString(),
+            // 'ok', 'no_city' or 'unknown_town': whether a drive-time search can
+            // find this market.
+            'location_status' => $this->locationStatus(),
+            // The drive from the place being searched near, when there is one.
+            'drive_minutes' => $this->drive_minutes,
+            'drive_km' => $this->drive_km,
             'schedules' => $this->schedules->map(fn ($schedule) => [
                 'id' => $schedule->id,
                 'label' => $schedule->label,

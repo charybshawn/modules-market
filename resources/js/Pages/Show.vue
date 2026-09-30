@@ -29,6 +29,11 @@
 
             <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
               <InlineField label="City" :model-value="market.city" :datalist-options="props.cities" :on-save="(v) => saveField('city', v)" />
+              <span
+                v-if="props.locationStatus !== 'ok'"
+                class="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30"
+                :title="props.locationStatus === 'no_city' ? 'No city is set, so this market can\'t be found by distance.' : 'This city isn\'t in the places list, so this market can\'t be found by distance.'"
+              >{{ props.locationStatus === 'no_city' ? 'No city' : 'Town not found' }}</span>
               <span class="text-gray-300 dark:text-gray-600">·</span>
               <InlineField label="Region" type="select" :model-value="market.region" :options="regionOptions" :on-save="(v) => saveField('region', v)" />
               <span class="text-gray-300 dark:text-gray-600">·</span>
@@ -313,6 +318,7 @@ interface MarketDetail {
 
 interface Props {
   market: MarketDetail
+  locationStatus: 'ok' | 'no_city' | 'unknown_town'
   cities: string[]
   regions: string[]
   marketTypes: string[]

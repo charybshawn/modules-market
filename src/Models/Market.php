@@ -2,6 +2,7 @@
 
 namespace Cultpantry\Market\Models;
 
+use Cultpantry\Market\Support\Places;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -175,6 +176,20 @@ class Market extends Model
             'liveness_score' => $s->liveness_score,
             'liveness_checked_at' => $s->liveness_checked_at?->toDateString(),
         ])->all();
+    }
+
+    /**
+     * Why this market can't be found by drive time, or 'ok' when it can:
+     * 'no_city' (nothing to locate) or 'unknown_town' (a city the places file
+     * doesn't have, so there is no point to route to).
+     */
+    public function locationStatus(): string
+    {
+        return match (true) {
+            blank($this->city) => 'no_city',
+            Places::find($this->city) === null => 'unknown_town',
+            default => 'ok',
+        };
     }
 
     public function schedules(): HasMany

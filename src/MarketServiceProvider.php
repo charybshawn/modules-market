@@ -3,6 +3,7 @@
 namespace Cultpantry\Market;
 
 use App\Support\AdminNav;
+use Cultpantry\Market\Console\WarmDriveTimes;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Policies\MarketPolicy;
 use Illuminate\Support\Facades\Gate;
@@ -10,6 +11,12 @@ use Illuminate\Support\ServiceProvider;
 
 class MarketServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        // Settings for the routing service (the key is read from ORS_API_KEY).
+        $this->mergeConfigFrom(__DIR__.'/../config/market.php', 'market');
+    }
+
     public function boot(): void
     {
         // 1. Admin routes -- additive merge into the existing admin route
@@ -25,6 +32,11 @@ class MarketServiceProvider extends ServiceProvider
         //     server-rendered Blade view doesn't need to live inside the
         //     host app's own resource tree to be found.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'market');
+
+        // 2c. `php artisan market:warm-drive-times`.
+        if ($this->app->runningInConsole()) {
+            $this->commands([WarmDriveTimes::class]);
+        }
 
         // 3. Nav entry. 'match' covers every market/* sub-page so the
         //    sidebar entry stays highlighted across Index/Create/Edit.

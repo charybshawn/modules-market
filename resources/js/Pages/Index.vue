@@ -148,6 +148,14 @@
 
       <FormErrorSummary v-if="Object.keys(importForm.errors).length" :errors="importForm.errors" class="mb-6" />
 
+      <p v-if="props.routingProblem" class="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200" role="status">
+        {{ props.routingProblem }}
+      </p>
+      <p v-else-if="nearTown && props.unlocated" class="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200" role="status">
+        {{ props.unlocated }} market{{ props.unlocated === 1 ? ' has' : 's have' }} no drive time, so {{ props.unlocated === 1 ? "it isn't" : "they aren't" }} included in this search
+        (no city, a town that isn't in the list, or no road route). Look for the badge in the list.
+      </p>
+
       <!-- No overflow-hidden here: it establishes a containing block for
            DataTable's sticky toolbar, pinning it at a fixed offset inside
            this box instead of sticking to the viewport. -->
@@ -161,6 +169,7 @@
           :initial-search="localFilters.search"
           :initial-filters="initialChips"
           infinite-scroll
+          collapsible-filters
           :has-more="hasMore"
           :loading-more="loadingMore"
           :total-count="props.markets.meta?.total"
@@ -186,6 +195,7 @@
                and are sent to the server with the rest of the filters. -->
           <template #filters-extra>
             <div class="border-t border-gray-200 pt-4 dark:border-gray-600">
+              <NearFilter v-model:near="nearTown" v-model:radius="nearRadius" :towns="props.places" class="mb-5" />
               <ScheduleLiveFilters
                 v-model:freq-states="freqStates"
                 v-model:months="months"
@@ -205,7 +215,9 @@
               <div class="flex items-center gap-3 min-w-0">
                 <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.name }}</span>
                 <span v-if="!item.is_active" class="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">Inactive</span>
+                <span v-if="item.location_status !== 'ok'" :class="[badgeClass, 'shrink-0']" :title="locationHint(item.location_status)">{{ locationLabel(item.location_status) }}</span>
                 <span class="shrink-0 truncate max-w-[40%] text-sm text-gray-500 dark:text-gray-400">{{ item.city ?? '—' }}</span>
+                <span v-if="item.drive_minutes != null" class="shrink-0 text-sm font-medium tabular-nums text-gray-900 dark:text-white">{{ formatDrive(item.drive_minutes) }}</span>
               </div>
               <div v-if="item.sponsor" class="truncate text-xs text-gray-400 dark:text-gray-500">{{ item.sponsor }}</div>
             </div>
@@ -215,12 +227,21 @@
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               {{ item.name }}
               <span v-if="!item.is_active" class="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">(Inactive)</span>
+              <span v-if="item.location_status !== 'ok'" :class="[badgeClass, 'ml-1.5 align-middle']" :title="locationHint(item.location_status)">{{ locationLabel(item.location_status) }}</span>
             </div>
             <div v-if="item.sponsor" class="text-xs text-gray-400 dark:text-gray-500">{{ item.sponsor }}</div>
           </template>
 
           <template #cell-city="{ item }">
             <span class="text-sm text-gray-500 dark:text-gray-400">{{ item.city ?? '—' }}</span>
+          </template>
+
+          <template #cell-drive_minutes="{ item }">
+            <template v-if="item.drive_minutes === null"><span class="text-sm text-gray-400 dark:text-gray-500">—</span></template>
+            <template v-else>
+              <span class="text-sm font-medium tabular-nums text-gray-900 dark:text-white">{{ formatDrive(item.drive_minutes) }}</span>
+              <span v-if="item.drive_minutes > 0 && item.drive_km !== null" class="block text-xs tabular-nums text-gray-400 dark:text-gray-500">{{ Math.round(item.drive_km) }} km</span>
+            </template>
           </template>
 
           <template #cell-region="{ item }">
@@ -280,6 +301,7 @@ import DataTable, { type Column } from '@/Components/Admin/DataTable.vue'
 import FormErrorSummary from '@/Components/Admin/FormErrorSummary.vue'
 import { useAdminIndexTable } from '@/composables/useAdminIndexTable'
 import ScheduleLiveFilters from './Partials/ScheduleLiveFilters.vue'
+import NearFilter from './Partials/NearFilter.vue'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
 
@@ -304,6 +326,9 @@ interface MarketRow {
   liveness_score: number | null
   liveness_checked_at: string | null
   is_active: boolean
+  location_status: 'ok' | 'no_city' | 'unknown_town'
+  drive_minutes: number | null
+  drive_km: number | null
 }
 
 interface MarketFilters {
@@ -321,12 +346,17 @@ interface MarketFilters {
   liveness_min?: number | string
   liveness_max?: number | string
   liveness_unchecked?: boolean
+  near?: string
+  radius?: number | string
 }
 
 interface Props {
   markets: { data: MarketRow[]; meta?: { current_page: number; last_page: number; total: number } }
   filters: MarketFilters
   counts: { total: number; active: number }
+  places: string[]
+  unlocated: number | null
+  routingProblem: string | null
   cities: string[]
   regions: string[]
   marketTypes: string[]
@@ -335,6 +365,20 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+// Why a market can't be found by distance; shown as a badge next to its name.
+const badgeClass = 'inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30'
+// "45 min", "2 h 6 min"; the drive from the place being searched near.
+const formatDrive = (minutes: number) => {
+  if (minutes === 0) return 'In town'
+  if (minutes < 60) return `${minutes} min`
+  return minutes % 60 === 0 ? `${minutes / 60} h` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`
+}
+const locationLabel = (status: MarketRow['location_status']) => (status === 'no_city' ? 'No city' : 'Town not found')
+const locationHint = (status: MarketRow['location_status']) =>
+  status === 'no_city'
+    ? "No city is set, so this market can't be found by distance."
+    : "This city isn't in the places list, so this market can't be found by distance."
 
 const frequencyLabel = (value: string) => props.frequencies[value] ?? value
 // Eloquent serializes date casts as ISO datetimes; parse the YYYY-MM-DD prefix
@@ -381,21 +425,27 @@ const livenessDotClass = (score: number) => {
 // deactivates on save) are hidden unless asked for: no `status` means "Active",
 // and the Status chip is how to include Inactive or see everything.
 
+// Guards the same trap as the controller's cast: an empty list has an array's
+// own `sort`, `filter` and so on.
+const echoed: MarketFilters = Array.isArray(props.filters) ? {} : (props.filters ?? {})
+
 const localFilters = ref<Record<string, any>>({
-  search: props.filters?.search ?? '',
-  status: props.filters?.status ?? 'active',
-  city: props.filters?.city ?? [],
-  region: props.filters?.region ?? [],
-  market_type: props.filters?.market_type ?? [],
-  sort: props.filters?.sort ?? 'name',
-  direction: props.filters?.direction ?? 'asc',
-  freq_include: props.filters?.freq_include ?? [],
-  freq_exclude: props.filters?.freq_exclude ?? [],
-  months: props.filters?.months ?? [],
-  match: props.filters?.match,
-  liveness_min: props.filters?.liveness_min,
-  liveness_max: props.filters?.liveness_max,
-  liveness_unchecked: props.filters?.liveness_unchecked ? 1 : undefined,
+  search: echoed.search ?? '',
+  status: echoed.status ?? 'active',
+  city: echoed.city ?? [],
+  region: echoed.region ?? [],
+  market_type: echoed.market_type ?? [],
+  sort: echoed.sort ?? 'name',
+  direction: echoed.direction ?? 'asc',
+  freq_include: echoed.freq_include ?? [],
+  freq_exclude: echoed.freq_exclude ?? [],
+  months: echoed.months ?? [],
+  match: echoed.match,
+  liveness_min: echoed.liveness_min,
+  liveness_max: echoed.liveness_max,
+  liveness_unchecked: echoed.liveness_unchecked ? 1 : undefined,
+  near: echoed.near || undefined,
+  radius: echoed.near ? Number(echoed.radius ?? 50) : undefined,
 })
 
 // DataTable's own chips start from what the server applied.
@@ -409,21 +459,23 @@ const initialChips = {
 // ---- Custom filters (schedule frequency, month, liveness range) ----
 
 const freqStates = ref<Record<string, 'include' | 'exclude'>>({
-  ...Object.fromEntries((props.filters?.freq_include ?? []).map((k) => [k, 'include'])),
-  ...Object.fromEntries((props.filters?.freq_exclude ?? []).map((k) => [k, 'exclude'])),
+  ...Object.fromEntries((echoed.freq_include ?? []).map((k) => [k, 'include'])),
+  ...Object.fromEntries((echoed.freq_exclude ?? []).map((k) => [k, 'exclude'])),
 })
-const months = ref<number[]>((props.filters?.months ?? []).map(Number))
-const matchMode = ref<'all' | 'any'>(props.filters?.match === 'any' ? 'any' : 'all')
-const livenessMin = ref(Number(props.filters?.liveness_min ?? 0))
-const livenessMax = ref(Number(props.filters?.liveness_max ?? 4))
-const includeUnchecked = ref(!!props.filters?.liveness_unchecked)
+const months = ref<number[]>((echoed.months ?? []).map(Number))
+const matchMode = ref<'all' | 'any'>(echoed.match === 'any' ? 'any' : 'all')
+const livenessMin = ref(Number(echoed.liveness_min ?? 0))
+const livenessMax = ref(Number(echoed.liveness_max ?? 4))
+const includeUnchecked = ref(!!echoed.liveness_unchecked)
+const nearTown = ref(echoed.near ?? '')
+const nearRadius = ref(Number(echoed.radius ?? 60))
 
 const includeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'include').map(([k]) => k))
 const excludeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'exclude').map(([k]) => k))
 const livenessFilterActive = computed(() => livenessMin.value > 0 || livenessMax.value < 4)
 // One badge count per active group, matching how DataTable counts its chips.
 const customFilterCount = computed(() =>
-  (includeFreqs.value.length || excludeFreqs.value.length ? 1 : 0) + (months.value.length ? 1 : 0) + (livenessFilterActive.value ? 1 : 0),
+  (includeFreqs.value.length || excludeFreqs.value.length ? 1 : 0) + (months.value.length ? 1 : 0) + (livenessFilterActive.value ? 1 : 0) + (nearTown.value ? 1 : 0),
 )
 
 const clearCustomFilters = () => {
@@ -433,6 +485,8 @@ const clearCustomFilters = () => {
   livenessMin.value = 0
   livenessMax.value = 4
   includeUnchecked.value = false
+  nearTown.value = ''
+  nearRadius.value = 60
 }
 
 const {
@@ -459,11 +513,25 @@ const {
   },
 })
 
+// Picking a town sorts by distance (nearest first); clearing it goes back to
+// the name order. Only when the sort was still the automatic one, so a column
+// the user chose themselves is left alone.
+watch(nearTown, (town, before) => {
+  const f = localFilters.value
+  if (town && !before && f.sort === 'name') {
+    f.sort = 'drive_minutes'
+    f.direction = 'asc'
+  } else if (!town && f.sort === 'drive_minutes') {
+    f.sort = 'name'
+    f.direction = 'asc'
+  }
+})
+
 // The custom filters live in this page's own state, so a change is pushed into
 // the shared filters and refetched here (DataTable only reports its own chips).
 // Debounced: the liveness slider fires on every step of a drag.
 let customTimer: ReturnType<typeof setTimeout> | undefined
-watch([freqStates, months, matchMode, livenessMin, livenessMax, includeUnchecked], () => {
+watch([freqStates, months, matchMode, livenessMin, livenessMax, includeUnchecked, nearTown, nearRadius], () => {
   clearTimeout(customTimer)
   customTimer = setTimeout(() => {
     const f = localFilters.value
@@ -474,6 +542,8 @@ watch([freqStates, months, matchMode, livenessMin, livenessMax, includeUnchecked
     f.liveness_min = livenessMin.value > 0 ? livenessMin.value : undefined
     f.liveness_max = livenessMax.value < 4 ? livenessMax.value : undefined
     f.liveness_unchecked = includeUnchecked.value ? 1 : undefined
+    f.near = nearTown.value || undefined
+    f.radius = nearTown.value ? nearRadius.value : undefined
     applyFilters()
   }, 250)
 }, { deep: true })
@@ -492,6 +562,8 @@ const columns = computed<Column[]>(() => [
     options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
   },
   { key: 'name', label: 'Market', sortable: true },
+  // Only while searching near a place: the drive to each market, beside its name.
+  ...(nearTown.value ? [{ key: 'drive_minutes', label: 'Drive', sortable: true }] : []),
   { key: 'city', label: 'City', sortable: true, filterable: true, filterType: 'multiselect', options: props.cities },
   { key: 'region', label: 'Region', sortable: true, filterable: true, filterType: 'multiselect', options: props.regions },
   { key: 'market_type', label: 'Type', hideable: true, filterable: true, filterType: 'multiselect', options: props.marketTypes },

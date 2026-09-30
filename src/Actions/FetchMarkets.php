@@ -4,6 +4,10 @@ namespace Cultpantry\Market\Actions;
 
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Models\MarketSchedule;
+use Cultpantry\Market\Support\DriveTimes;
+use Cultpantry\Market\Support\Origins;
+use Cultpantry\Market\Support\Places;
+use Cultpantry\Market\Support\RoutingUnavailable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -18,14 +22,32 @@ use Illuminate\Support\Collection;
  * months does this date range touch, ignoring the year" has no tidy SQL form.
  * That path loads every market matching the cheaper filters, which is fine at
  * this list's size and only happens while a schedule filter is switched on.
+ *
+ * "Near a town (or postal code)" is by drive time. The starting point is looked
+ * up (Origins), then the drive to each market's town comes from the cache, with
+ * any pairs not yet in it fetched from the routing service in one request
+ * (DriveTimes). If the service can't answer, the list comes back unfiltered and
+ * $routingFailed says so; a market with no drive time (no city, a town not in the
+ * places file, or no route) can't be placed, and $unplaced counts them.
  */
 class FetchMarkets
 {
     public const PER_PAGE = 25;
 
-    public const SORTABLE = ['name', 'city', 'region', 'sponsor', 'liveness_score'];
+    public const SORTABLE = ['name', 'city', 'region', 'sponsor', 'liveness_score', 'drive_minutes'];
 
     private const SEARCHED = ['name', 'city', 'region', 'market_type', 'sponsor', 'phone'];
+
+    /** A "near" search was asked for but the routing service couldn't answer, so the list is unfiltered. */
+    public bool $routingFailed = false;
+
+    /** The "near" text that is neither a listed town nor a postal code that could be located. */
+    public ?string $originNotFound = null;
+
+    /** Markets a "near" search had to leave out because there is no drive time to them. */
+    public int $unplaced = 0;
+
+    public function __construct(private Origins $origins, private DriveTimes $driveTimes) {}
 
     /**
      * @param  array<string, mixed>  $filters  the validated query string; anything absent takes its default
@@ -34,7 +56,7 @@ class FetchMarkets
     {
         $f = $this->normalize($filters);
 
-        if (! $this->scheduleFilterActive($f)) {
+        if (! $this->scheduleFilterActive($f) && $f['near'] === '') {
             $paginator = $this->query($f)->paginate(self::PER_PAGE)->withQueryString();
             $paginator->getCollection()->each(fn (Market $market) => $market->setAttribute('matched_schedule_ids', []));
 
@@ -70,6 +92,9 @@ class FetchMarkets
      */
     private function normalize(array $filters): array
     {
+        $near = trim((string) ($filters['near'] ?? ''));
+        $sort = in_array($filters['sort'] ?? null, self::SORTABLE, true) ? $filters['sort'] : 'name';
+
         return [
             'search' => trim((string) ($filters['search'] ?? '')),
             // Inactive markets stay hidden unless asked for, so a request
@@ -78,7 +103,8 @@ class FetchMarkets
             'city' => array_values($filters['city'] ?? []),
             'region' => array_values($filters['region'] ?? []),
             'market_type' => array_values($filters['market_type'] ?? []),
-            'sort' => in_array($filters['sort'] ?? null, self::SORTABLE, true) ? $filters['sort'] : 'name',
+            // Drive time only means something once there is a starting point.
+            'sort' => $sort === 'drive_minutes' && $near === '' ? 'name' : $sort,
             'direction' => ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc',
             'freq_include' => array_values($filters['freq_include'] ?? []),
             'freq_exclude' => array_values($filters['freq_exclude'] ?? []),
@@ -87,6 +113,9 @@ class FetchMarkets
             'liveness_min' => (int) ($filters['liveness_min'] ?? 0),
             'liveness_max' => (int) ($filters['liveness_max'] ?? 4),
             'liveness_unchecked' => (bool) ($filters['liveness_unchecked'] ?? false),
+            'near' => $near,
+            // Minutes of driving.
+            'radius' => max(1, (int) ($filters['radius'] ?? 60)),
         ];
     }
 
@@ -98,10 +127,20 @@ class FetchMarkets
     {
         $markets = $this->query($f)->get();
 
-        if (! $this->scheduleFilterActive($f)) {
-            return $markets->each(fn (Market $market) => $market->setAttribute('matched_schedule_ids', []));
-        }
+        $markets = $this->scheduleFilterActive($f)
+            ? $this->withMatchingSchedules($markets, $f)
+            : $markets->each(fn (Market $market) => $market->setAttribute('matched_schedule_ids', []));
 
+        return $f['near'] === '' ? $markets : $this->withinDriveTime($markets, $f);
+    }
+
+    /**
+     * @param  Collection<int, Market>  $markets
+     * @param  array<string, mixed>  $f  normalized
+     * @return Collection<int, Market>
+     */
+    private function withMatchingSchedules(Collection $markets, array $f): Collection
+    {
         $needsAMatch = $f['freq_include'] !== [] || $f['months'] !== [];
 
         return $markets->flatMap(function (Market $market) use ($f, $needsAMatch) {
@@ -119,6 +158,55 @@ class FetchMarkets
             // that has no schedules at all.
             return $market->schedules->isNotEmpty() && $matched->isEmpty() ? [] : [$market];
         })->values();
+    }
+
+    /**
+     * Keeps the markets within the drive-time radius of the starting point, each
+     * carrying its minutes and kilometres, nearest first when sorted by them.
+     *
+     * @param  Collection<int, Market>  $markets
+     * @param  array<string, mixed>  $f  normalized
+     * @return Collection<int, Market>
+     */
+    private function withinDriveTime(Collection $markets, array $f): Collection
+    {
+        try {
+            $origin = $this->origins->resolve($f['near']);
+            if ($origin === null) {
+                $this->originNotFound = $f['near'];
+
+                return $markets;
+            }
+
+            $destinations = [];
+            foreach ($markets as $market) {
+                if ($place = Places::find($market->city)) {
+                    $destinations[Places::normalize($place['name'])] = ['lat' => $place['lat'], 'lng' => $place['lng']];
+                }
+            }
+
+            $times = $this->driveTimes->from($origin, $destinations);
+        } catch (RoutingUnavailable) {
+            $this->routingFailed = true;
+
+            return $markets;
+        }
+
+        $timed = $markets->each(function (Market $market) use ($times) {
+            $time = $times[Places::key($market->city) ?? ''] ?? null;
+            $market->setAttribute('drive_minutes', $time['minutes'] ?? null);
+            $market->setAttribute('drive_km', $time['km'] ?? null);
+        });
+
+        $this->unplaced = $timed->filter(fn (Market $market) => $market->drive_minutes === null)->count();
+
+        $near = $timed->filter(fn (Market $market) => $market->drive_minutes !== null && $market->drive_minutes <= $f['radius']);
+
+        if ($f['sort'] === 'drive_minutes') {
+            $near = $near->sortBy([['drive_minutes', $f['direction']], ['name', 'asc']]);
+        }
+
+        return $near->values();
     }
 
     /**
@@ -156,9 +244,14 @@ class FetchMarkets
             });
         }
 
-        $query->orderBy($f['sort'], $f['direction']);
-        if ($f['sort'] !== 'name') {
+        // Drive time is ordered in PHP once it is known.
+        if ($f['sort'] === 'drive_minutes') {
             $query->orderBy('name');
+        } else {
+            $query->orderBy($f['sort'], $f['direction']);
+            if ($f['sort'] !== 'name') {
+                $query->orderBy('name');
+            }
         }
 
         return $query->orderBy('id');

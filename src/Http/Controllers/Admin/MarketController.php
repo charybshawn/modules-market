@@ -15,6 +15,7 @@ use Cultpantry\Market\Http\Resources\MarketResource;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Models\MarketSchedule;
 use Cultpantry\Market\Support\MarketEventPresenter;
+use Cultpantry\Market\Support\Places;
 use Cultpantry\Market\Support\ScheduleOccurrences;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -64,7 +65,18 @@ class MarketController extends Controller implements HasMiddleware
 
         return Inertia::render('Vendor/market/Index', [
             'markets' => MarketResource::collection($fetchMarkets->handle($filters)),
-            'filters' => $filters,
+            // An object even when empty: PHP would send `[]`, and in JavaScript
+            // `[].sort` is the array method, not a missing value.
+            'filters' => (object) $filters,
+            // How many markets a "near" search had to leave out for want of a
+            // drive time, and anything that stopped it working.
+            'unlocated' => fn () => filled($filters['near'] ?? null) ? $fetchMarkets->unplaced : null,
+            'routingProblem' => fn () => match (true) {
+                $fetchMarkets->routingFailed => "Drive times aren't available right now, so this list isn't filtered by distance.",
+                $fetchMarkets->originNotFound !== null => "Couldn't find \"{$fetchMarkets->originNotFound}\". Pick a town from the list, or enter a full postal code like V1E 4N2.",
+                default => null,
+            },
+            'places' => fn () => Places::options($this->knownValues('city')),
             'counts' => fn () => [
                 'total' => Market::count(),
                 'active' => Market::where('is_active', true)->count(),
@@ -186,6 +198,7 @@ class MarketController extends Controller implements HasMiddleware
 
         return Inertia::render('Vendor/market/Show', [
             'market' => $market->load('schedules'),
+            'locationStatus' => $market->locationStatus(),
             'cities' => $this->knownValues('city'),
             'regions' => Market::REGIONS,
             'marketTypes' => $this->knownValues('market_type'),
@@ -389,6 +402,9 @@ class MarketController extends Controller implements HasMiddleware
         if ($result['deactivated'] > 0) {
             $message .= " Marked {$result['deactivated']} market".($result['deactivated'] === 1 ? '' : 's').' inactive (liveness score '.Market::DEACTIVATE_AT_OR_BELOW.' or below).';
         }
+        if ($result['unknown_towns'] !== []) {
+            $message .= ' Not in the places list: '.implode(', ', $result['unknown_towns'])." -- those markets are flagged and won't show up in a distance search until the town is added to the module's bc-places.json.";
+        }
         if ($result['region_unmatched'] > 0) {
             $message .= " {$result['region_unmatched']} row".($result['region_unmatched'] === 1 ? '' : 's')." had a region that didn't match the controlled list -- imported without one, set it by hand on that market's Edit page.";
         }
@@ -444,7 +460,7 @@ class MarketController extends Controller implements HasMiddleware
         if (! empty($validated['ids'])) {
             $ids = array_filter(array_map('trim', explode(',', $validated['ids'])), fn ($id) => ctype_digit($id));
             $markets = Market::with('schedules')->whereIn('id', $ids)->orderBy('name')->get();
-        } elseif ($request->hasAny(['search', 'status', 'city', 'region', 'market_type', 'freq_include', 'freq_exclude', 'months', 'liveness_min', 'liveness_max'])) {
+        } elseif ($request->hasAny(['search', 'status', 'city', 'region', 'market_type', 'freq_include', 'freq_exclude', 'months', 'liveness_min', 'liveness_max', 'near'])) {
             $markets = $fetchMarkets->all($validated);
         } else {
             $markets = Market::with('schedules')->orderBy('name')->get();
@@ -486,6 +502,8 @@ class MarketController extends Controller implements HasMiddleware
             'liveness_min' => ['nullable', 'integer', 'between:0,4'],
             'liveness_max' => ['nullable', 'integer', 'between:0,4'],
             'liveness_unchecked' => ['nullable', 'boolean'],
+            'near' => ['nullable', 'string', 'max:255'],
+            'radius' => ['nullable', 'integer', 'between:1,1440'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

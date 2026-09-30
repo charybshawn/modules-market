@@ -88,7 +88,7 @@ you've opted in to replacing the set.
 | Element | Notes |
 |---|---|
 | `name` | Required. |
-| `city` | Free text. |
+| `city` | The BC town the market is in, spelled as the town is normally written ("Salmon Arm", "West Kelowna"). It is free text, but it is also what a drive-time search locates the market by: a city missing here shows a "No city" badge, and one that isn't in `resources/data/bc-places.json` shows "Town not found" and can't be found by drive time. The import reports any such towns. |
 | `region` | One of the controlled list above. |
 | `market_type` | Free text — "Farmers", "Artisan", "Makers", etc. |
 | `sponsor` | The business or organization behind the market, when that isn't already in its name — e.g. a night market at a resort, run by the resort's restaurant (`Finz Restaurant`). Leave it out when the market is simply run by its own organization. |
