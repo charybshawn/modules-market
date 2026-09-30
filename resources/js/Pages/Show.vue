@@ -8,10 +8,6 @@
       <AdminMobileHeader :title="market.name" :href="route('admin.market.index')" />
 
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
-        <div v-if="$page.props.flash?.success" class="m-6 mb-0 rounded-md bg-green-50 dark:bg-green-900/20 p-4">
-          <p class="text-sm font-medium text-green-800 dark:text-green-200">{{ $page.props.flash.success }}</p>
-        </div>
-
         <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
           <div class="min-w-0 flex-1 space-y-2">
             <!-- Name is only inline-editable on desktop: on mobile the name
