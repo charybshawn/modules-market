@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $market_id
  * @property string|null $label
  * @property string|null $frequency one of Market::FREQUENCIES' keys
- * @property string|null $frequency_detail
  * @property array<int, int>|null $weekdays 0 = Sunday ... 6 = Saturday
  * @property int|null $week_of_month 1-4, or -1 for the last; monthly only
  * @property string|null $start_time H:i
@@ -33,7 +32,6 @@ class MarketSchedule extends Model
         'market_id',
         'label',
         'frequency',
-        'frequency_detail',
         'weekdays',
         'week_of_month',
         'start_time',
@@ -109,6 +107,38 @@ class MarketSchedule extends Model
         $trim = fn (?string $value) => $value === null || $value === '' ? null : substr($value, 0, 5);
 
         return Attribute::make(get: $trim, set: $trim);
+    }
+
+    /**
+     * "Every Sat & Sun · 8:30 am – 12:30 pm" -- the structured days and hours
+     * in words, for the PDF. Mirrors recurrenceSummary() in
+     * scheduleSummary.ts, which does the same for the browser.
+     */
+    public function recurrenceSummary(): string
+    {
+        $names = collect($this->weekdays ?? [])->map(fn (int $day) => ucfirst(self::WEEKDAYS[$day]))->all();
+        $days = count($names) <= 1 ? implode('', $names) : implode(', ', array_slice($names, 0, -1)).' & '.end($names);
+
+        $when = '';
+        if ($days !== '' && $this->frequency === 'monthly' && $this->week_of_month !== null) {
+            $when = self::WEEKS_OF_MONTH[$this->week_of_month].' '.$days.' of the month';
+        } elseif ($days !== '' && $this->frequency === 'biweekly') {
+            $when = 'Every other '.$days;
+        } elseif ($days !== '') {
+            $when = 'Every '.$days;
+        }
+
+        $time = fn (?string $value) => $value === null ? '' : ltrim(date('g:i a', strtotime($value)), '0');
+        $format = fn (?string $value) => str_replace(':00 ', ' ', $time($value));
+
+        $hours = match (true) {
+            $this->start_time !== null && $this->end_time !== null => $format($this->start_time).' – '.$format($this->end_time),
+            $this->start_time !== null => 'From '.$format($this->start_time),
+            $this->end_time !== null => 'Until '.$format($this->end_time),
+            default => '',
+        };
+
+        return implode(' · ', array_filter([$when, $hours]));
     }
 
     /**

@@ -40,7 +40,7 @@
           </a>
           <a
             :href="pdfExportHref"
-            :title="`Downloads a print-ready PDF of the ${filteredIds.length} market${filteredIds.length === 1 ? '' : 's'} currently shown below (respects search and filters).`"
+            :title="`Downloads a print-ready PDF of the ${props.markets.meta?.total ?? 0} market${props.markets.meta?.total === 1 ? '' : 's'} matching the search and filters below.`"
             class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
           >
             Download PDF
@@ -73,7 +73,7 @@
       <div class="md:hidden mb-6 rounded-lg bg-gray-200 dark:bg-amber-500 px-5 pt-[30px] pb-[20px]">
         <div class="text-center">
           <div class="text-sm font-bold text-gray-800">Active Markets</div>
-          <div class="mt-1 text-4xl font-extrabold text-emerald-600">{{ props.markets.filter((m) => m.is_active).length }}</div>
+          <div class="mt-1 text-4xl font-extrabold text-emerald-600">{{ props.counts.active }}</div>
         </div>
         <div class="mt-[30px] flex items-center justify-around">
           <div class="flex flex-col items-center gap-3">
@@ -154,16 +154,26 @@
       <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
         <DataTable
           :columns="columns"
-          :items="rows"
-          :initial-filters="{ status: ['active'] }"
+          :items="accumulatedMarkets"
+          :sort-field="localFilters.sort"
+          :sort-direction="localFilters.direction"
+          server-mode
+          :initial-search="localFilters.search"
+          :initial-filters="initialChips"
+          infinite-scroll
+          :has-more="hasMore"
+          :loading-more="loadingMore"
+          :total-count="props.markets.meta?.total"
           filter-grid-class="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
           :extra-filter-count="customFilterCount"
-          @clear-filters="clearCustomFilters"
-          @update:filtered-ids="(ids) => (filteredIds = ids as number[])"
           table-id="market-markets"
           item-key="id"
           searchable
           search-placeholder="Search markets..."
+          @sort="handleSort"
+          @filters-change="handleFiltersChange"
+          @load-more="handleLoadMore"
+          @clear-filters="clearCustomFilters"
           :empty-message="customFilterCount ? 'No markets match these schedule or liveness filters.' : 'No markets yet.'"
           :empty-action-label="customFilterCount ? '' : 'Add your first market'"
           :empty-action-href="route('admin.market.create')"
@@ -173,7 +183,7 @@
           <!-- Filters DataTable's own chips can't express: schedule frequency
                with exclusion ("not weekly"), months a schedule falls in, and a
                liveness range. They render inside DataTable's Filters dropdown
-               and narrow `rows` before DataTable sees them. -->
+               and are sent to the server with the rest of the filters. -->
           <template #filters-extra>
             <div class="border-t border-gray-200 pt-4 dark:border-gray-600">
               <ScheduleLiveFilters
@@ -230,9 +240,11 @@
               <div
                 v-for="schedule in visibleSchedules(item)"
                 :key="schedule.id"
-                class="truncate"
                 :class="item.matched_schedule_ids.includes(schedule.id) ? 'font-medium text-gray-900 dark:text-white' : ''"
-              >{{ scheduleSummary(schedule) }}</div>
+              >
+                <div class="truncate">{{ scheduleSummary(schedule) }}</div>
+                <div v-if="datesShown && scheduleDates(schedule)" class="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{{ scheduleDates(schedule) }}</div>
+              </div>
               <div v-if="item.schedules.length > visibleSchedules(item).length" class="text-xs text-gray-400 dark:text-gray-500">+{{ item.schedules.length - visibleSchedules(item).length }} more</div>
             </div>
             <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
@@ -260,12 +272,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
 import DataTable, { type Column } from '@/Components/Admin/DataTable.vue'
 import FormErrorSummary from '@/Components/Admin/FormErrorSummary.vue'
+import { useAdminIndexTable } from '@/composables/useAdminIndexTable'
 import ScheduleLiveFilters from './Partials/ScheduleLiveFilters.vue'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
@@ -286,14 +299,34 @@ interface MarketRow {
   market_type: string | null
   sponsor: string | null
   schedules: ScheduleRow[]
+  matched_schedule_ids: number[]
   phone: string | null
   liveness_score: number | null
   liveness_checked_at: string | null
   is_active: boolean
 }
 
+interface MarketFilters {
+  search?: string
+  status?: 'active' | 'inactive' | 'all'
+  city?: string[]
+  region?: string[]
+  market_type?: string[]
+  sort?: string
+  direction?: 'asc' | 'desc'
+  freq_include?: string[]
+  freq_exclude?: string[]
+  months?: (number | string)[]
+  match?: 'all' | 'any'
+  liveness_min?: number | string
+  liveness_max?: number | string
+  liveness_unchecked?: boolean
+}
+
 interface Props {
-  markets: MarketRow[]
+  markets: { data: MarketRow[]; meta?: { current_page: number; last_page: number; total: number } }
+  filters: MarketFilters
+  counts: { total: number; active: number }
   cities: string[]
   regions: string[]
   marketTypes: string[]
@@ -317,13 +350,14 @@ const scheduleDates = (schedule: ScheduleRow) => {
   const only = start ?? end
   return only ? shortDate(only) : null
 }
-// Dates join the summary once a frequency or month filter is on, since
-// "which October?" is the whole point then; the plain list stays compact.
+// Dates appear once a frequency or month filter is on, since "which
+// October?" is the whole point then; the plain list stays compact. They sit on
+// their own line directly under the schedule's title, never inline with it.
+const datesShown = computed(() => includeFreqs.value.length > 0 || excludeFreqs.value.length > 0 || months.value.length > 0)
 const scheduleSummary = (schedule: ScheduleRow) =>
   [
     schedule.label,
     schedule.frequency ? frequencyLabel(schedule.frequency) : null,
-    includeFreqs.value.length || excludeFreqs.value.length || months.value.length ? scheduleDates(schedule) : null,
   ].filter(Boolean).join(' · ') || 'Schedule'
 const livenessLabel = (score: number) => props.livenessLabels[score] ?? 'Unknown'
 
@@ -338,18 +372,51 @@ const livenessDotClass = (score: number) => {
   return 'bg-red-500 dark:bg-red-400'
 }
 
+// ---- Filters ----
+//
+// Search, the chips, sort and the custom filters below are all applied on the
+// server (FetchMarkets), and every page of the infinite scroll is fetched under
+// them. `props.filters` is what the server applied, so the page starts from it.
 // Inactive markets (including anything scored 1 or below, which the model
-// deactivates on save) are hidden by default: the Status filter starts on
-// "Active" via :initial-filters, and stays reachable as a filter chip rather
-// than a separate page -- tick Inactive as well, or clear it to see everything.
+// deactivates on save) are hidden unless asked for: no `status` means "Active",
+// and the Status chip is how to include Inactive or see everything.
+
+const localFilters = ref<Record<string, any>>({
+  search: props.filters?.search ?? '',
+  status: props.filters?.status ?? 'active',
+  city: props.filters?.city ?? [],
+  region: props.filters?.region ?? [],
+  market_type: props.filters?.market_type ?? [],
+  sort: props.filters?.sort ?? 'name',
+  direction: props.filters?.direction ?? 'asc',
+  freq_include: props.filters?.freq_include ?? [],
+  freq_exclude: props.filters?.freq_exclude ?? [],
+  months: props.filters?.months ?? [],
+  match: props.filters?.match,
+  liveness_min: props.filters?.liveness_min,
+  liveness_max: props.filters?.liveness_max,
+  liveness_unchecked: props.filters?.liveness_unchecked ? 1 : undefined,
+})
+
+// DataTable's own chips start from what the server applied.
+const initialChips = {
+  status: localFilters.value.status === 'all' ? [] : [localFilters.value.status],
+  city: localFilters.value.city,
+  region: localFilters.value.region,
+  market_type: localFilters.value.market_type,
+}
+
 // ---- Custom filters (schedule frequency, month, liveness range) ----
 
-const freqStates = ref<Record<string, 'include' | 'exclude'>>({})
-const months = ref<number[]>([])
-const matchMode = ref<'all' | 'any'>('all')
-const livenessMin = ref(0)
-const livenessMax = ref(4)
-const includeUnchecked = ref(false)
+const freqStates = ref<Record<string, 'include' | 'exclude'>>({
+  ...Object.fromEntries((props.filters?.freq_include ?? []).map((k) => [k, 'include'])),
+  ...Object.fromEntries((props.filters?.freq_exclude ?? []).map((k) => [k, 'exclude'])),
+})
+const months = ref<number[]>((props.filters?.months ?? []).map(Number))
+const matchMode = ref<'all' | 'any'>(props.filters?.match === 'any' ? 'any' : 'all')
+const livenessMin = ref(Number(props.filters?.liveness_min ?? 0))
+const livenessMax = ref(Number(props.filters?.liveness_max ?? 4))
+const includeUnchecked = ref(!!props.filters?.liveness_unchecked)
 
 const includeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'include').map(([k]) => k))
 const excludeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'exclude').map(([k]) => k))
@@ -368,68 +435,48 @@ const clearCustomFilters = () => {
   includeUnchecked.value = false
 }
 
-// Every calendar month a schedule touches, ignoring the year: a 2023 edition
-// in November still says "this runs in November". A schedule with no dates
-// covers nothing (unknown, not "always"); one date covers just its month.
-const monthsCovered = (schedule: ScheduleRow): Set<number> => {
-  const covered = new Set<number>()
-  const start = schedule.start_date?.slice(0, 10)
-  const end = schedule.end_date?.slice(0, 10)
-  if (!start && !end) return covered
-  if (!start || !end) {
-    covered.add(Number((start ?? end)!.slice(5, 7)))
-    return covered
-  }
-  let year = Number(start.slice(0, 4))
-  let month = Number(start.slice(5, 7))
-  const last = Number(end.slice(0, 4)) * 12 + Number(end.slice(5, 7))
-  for (let i = 0; i < 12 && year * 12 + month <= last; i++) {
-    covered.add(month)
-    if (++month > 12) { month = 1; year++ }
-  }
-  return covered
-}
-
-// An excluded frequency can never match; otherwise a schedule must satisfy
-// whichever include groups are active, all of them or any of them.
-const scheduleMatches = (schedule: ScheduleRow): boolean => {
-  if (schedule.frequency && excludeFreqs.value.includes(schedule.frequency)) return false
-  const checks: boolean[] = []
-  if (includeFreqs.value.length) checks.push(!!schedule.frequency && includeFreqs.value.includes(schedule.frequency))
-  if (months.value.length) {
-    const covered = monthsCovered(schedule)
-    checks.push(months.value.some((m) => covered.has(m)))
-  }
-  if (!checks.length) return true
-  return matchMode.value === 'all' ? checks.every(Boolean) : checks.some(Boolean)
-}
-
-const rows = computed(() => {
-  let list = props.markets.map((m) => ({
-    ...m,
-    status: m.is_active ? 'active' : 'inactive',
-    matched_schedule_ids: [] as number[],
-  }))
-
-  if (livenessFilterActive.value) {
-    list = list.filter((m) =>
-      m.liveness_score === null
-        ? includeUnchecked.value
-        : m.liveness_score >= livenessMin.value && m.liveness_score <= livenessMax.value,
-    )
-  }
-
-  if (!includeFreqs.value.length && !excludeFreqs.value.length && !months.value.length) return list
-
-  const needsAMatch = includeFreqs.value.length > 0 || months.value.length > 0
-  return list.flatMap((m) => {
-    const matched = m.schedules.filter(scheduleMatches)
-    if (needsAMatch) return matched.length ? [{ ...m, matched_schedule_ids: matched.map((s) => s.id) }] : []
-    // Only exclusions: hide a market once *all* its schedules are excluded
-    // ("not weekly" drops a weekly-only market), but keep one that has none.
-    return m.schedules.length && !matched.length ? [] : [m]
-  })
+const {
+  accumulatedItems: accumulatedMarkets,
+  hasMore,
+  loadingMore,
+  applyFilters,
+  handleSort,
+  handleFiltersChange,
+  handleLoadMore,
+} = useAdminIndexTable({
+  routeName: 'admin.market.index',
+  dataKey: 'markets',
+  getItems: () => props.markets.data,
+  getMeta: () => props.markets.meta,
+  filters: localFilters.value,
+  mapDataTableFilters: ({ search, filters }, f) => {
+    f.search = search
+    const status = (filters.status as string[] | undefined) ?? []
+    f.status = status.length === 1 ? status[0] : 'all'
+    f.city = (filters.city as string[] | undefined) ?? []
+    f.region = (filters.region as string[] | undefined) ?? []
+    f.market_type = (filters.market_type as string[] | undefined) ?? []
+  },
 })
+
+// The custom filters live in this page's own state, so a change is pushed into
+// the shared filters and refetched here (DataTable only reports its own chips).
+// Debounced: the liveness slider fires on every step of a drag.
+let customTimer: ReturnType<typeof setTimeout> | undefined
+watch([freqStates, months, matchMode, livenessMin, livenessMax, includeUnchecked], () => {
+  clearTimeout(customTimer)
+  customTimer = setTimeout(() => {
+    const f = localFilters.value
+    f.freq_include = includeFreqs.value
+    f.freq_exclude = excludeFreqs.value
+    f.months = months.value
+    f.match = matchMode.value === 'any' ? 'any' : undefined
+    f.liveness_min = livenessMin.value > 0 ? livenessMin.value : undefined
+    f.liveness_max = livenessMax.value < 4 ? livenessMax.value : undefined
+    f.liveness_unchecked = includeUnchecked.value ? 1 : undefined
+    applyFilters()
+  }, 250)
+}, { deep: true })
 
 // With a schedule filter on, show every schedule that matched -- they're the
 // reason the market is in the list, so none may hide behind "+N more". With
@@ -472,6 +519,9 @@ const handleFileChange = (event: Event) => {
   importForm.file = file
   importForm.post(route('admin.market.import'), {
     forceFormData: true,
+    // Remount the whole page on success (fresh list with the new markets);
+    // keep it on a validation error so the form and its errors survive.
+    preserveState: (page) => Object.keys(page.props.errors ?? {}).length > 0,
     onSuccess: () => { importForm.reset() },
     // Cleared either way -- picking the same file again wouldn't otherwise
     // fire a new 'change' event, since its value never changed from the
@@ -484,15 +534,19 @@ const handleFileChange = (event: Event) => {
   })
 }
 
-// Kept in sync by DataTable's own @update:filtered-ids -- the ids of
-// exactly what filteredItems holds there right now (after its search box,
-// status/city/region/type chips, and this page's own schedule/liveness
-// filters above have all applied), so the PDF download always matches
-// what's actually on screen rather than the pre-DataTable-filtering `rows`.
-const filteredIds = ref<number[]>([])
 // The injected helper, not the global route(): this computed runs during
 // render, and the global only exists in the browser -- server-side
 // rendering has just what ZiggyVue provides.
 const ziggyRoute = inject<typeof route>('route')!
-const pdfExportHref = computed(() => ziggyRoute('admin.market.export-pdf', { ids: filteredIds.value.join(',') }))
+// The PDF is built from the same search and filters the list is under (every
+// page of them, not just what has scrolled into view). Status is always sent
+// so the link means "this view", never the bare "export everything" link.
+const pdfExportHref = computed(() => {
+  const params = Object.fromEntries(
+    Object.entries(localFilters.value).filter(
+      ([k, v]) => k !== 'sort' && k !== 'direction' && v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0),
+    ),
+  )
+  return ziggyRoute('admin.market.export-pdf', params)
+})
 </script>

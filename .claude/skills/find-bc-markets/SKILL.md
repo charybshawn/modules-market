@@ -183,11 +183,11 @@ matters:
 
    **Deep-parse every schedule down to days and times.** The admin calendar
    places markets using `<weekdays>`, `<week_of_month>`, `<start_time>` and
-   `<end_time>`, not the free-text `<frequency_detail>`. For each schedule,
-   turn the source's wording into those fields: "Saturdays 8:30am-12:30pm"
-   becomes `sat` / `08:30` / `12:30`, and "last Sunday of the month"
-   becomes `monthly` / `sun` / `last`. Keep the original wording in
-   `<frequency_detail>` too. Split a schedule when different days have
+   `<end_time>`; there is no free-text days-and-hours field. For each
+   schedule, turn the source's wording into those fields: "Saturdays
+   8:30am-12:30pm" becomes `sat` / `08:30` / `12:30`, and "last Sunday of the
+   month" becomes `monthly` / `sun` / `last`. Anything left over (entry fee,
+   vendor count, closures) goes in the schedule's `<notes>`. Split a schedule when different days have
    different hours, or when a monthly market runs on more than one week.
    Encode only what the source actually states. Follow the rules and
    worked examples in `references/market-xml-schema.md` → "Deep-parsing

@@ -205,7 +205,6 @@ defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: tr
 interface MarketScheduleDetail {
   label: string | null
   frequency: string | null
-  frequency_detail: string | null
   weekdays: number[] | null
   week_of_month: number | null
   start_time: string | null
@@ -290,7 +289,6 @@ const form = useForm({
   schedules: props.market.schedules.map((s): ScheduleForm => ({
     label: s.label ?? '',
     frequency: s.frequency,
-    frequency_detail: s.frequency_detail ?? '',
     weekdays: [...(s.weekdays ?? [])],
     week_of_month: s.week_of_month,
     start_time: s.start_time ?? '',

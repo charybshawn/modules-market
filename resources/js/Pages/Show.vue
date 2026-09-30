@@ -110,11 +110,24 @@
                       {{ schedule.label ?? 'Schedule' }}
                       <span v-if="schedule.frequency" class="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{{ frequencyLabel(schedule.frequency) }}</span>
                     </div>
-                    <div v-if="recurrenceSummary(schedule)" class="text-sm text-gray-900 dark:text-white">{{ recurrenceSummary(schedule) }}</div>
-                    <div v-if="schedule.frequency_detail" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ schedule.frequency_detail }}</div>
-                    <div v-if="dateRange(schedule)" class="text-sm text-gray-500 dark:text-gray-400">{{ dateRange(schedule) }}</div>
+                    <div v-if="dateRange(schedule) || recurrenceSummary(schedule)" class="flex flex-wrap items-center gap-2 py-1">
+                      <span
+                        v-if="dateRange(schedule)"
+                        class="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 px-2.5 py-1 text-sm font-semibold tabular-nums text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-200 dark:ring-indigo-400/30"
+                      >
+                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5M5.25 5.25h13.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-12a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>
+                        {{ dateRange(schedule) }}
+                      </span>
+                      <span
+                        v-if="recurrenceSummary(schedule)"
+                        class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-sm font-semibold tabular-nums text-gray-900 ring-1 ring-inset ring-gray-200 dark:bg-gray-700/60 dark:text-white dark:ring-gray-600"
+                      >
+                        <svg class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-400" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75V12l3.25 1.9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        {{ recurrenceSummary(schedule) }}
+                      </span>
+                    </div>
+                    <div v-if="schedule.notes" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ schedule.notes }}</div>
                     <div v-if="schedule.address_line1" class="text-sm text-gray-500 dark:text-gray-400">At {{ schedule.address_line1 }}</div>
-                    <div v-if="schedule.notes" class="text-xs text-gray-400 dark:text-gray-500 whitespace-pre-line">{{ schedule.notes }}</div>
                   </div>
                   <span
                     class="shrink-0 inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300"
@@ -258,7 +271,6 @@ interface ScheduleDetail {
   id: number
   label: string | null
   frequency: string | null
-  frequency_detail: string | null
   weekdays: number[] | null
   week_of_month: number | null
   start_time: string | null
@@ -342,7 +354,14 @@ const formatDate = (iso: string | null | undefined) => {
   return new Date(y, m - 1, d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+// A single day reads best with its weekday ("Sat, Aug 8, 2026").
+const formatDay = (iso: string) => {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const dateRange = (s: ScheduleDetail) => {
+  if (s.start_date && s.end_date && s.start_date.slice(0, 10) === s.end_date.slice(0, 10)) return formatDay(s.start_date)
   const start = formatDate(s.start_date)
   const end = formatDate(s.end_date)
   if (start && end) return `${start} – ${end}`

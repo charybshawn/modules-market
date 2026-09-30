@@ -61,7 +61,6 @@ const addSchedule = () => {
     {
       label: '',
       frequency: null,
-      frequency_detail: '',
       weekdays: [],
       week_of_month: null,
       start_time: '',

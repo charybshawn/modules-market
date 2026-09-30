@@ -67,7 +67,6 @@ export interface ScheduleDetail {
   id: number
   label: string | null
   frequency: string | null
-  frequency_detail: string | null
   weekdays: number[] | null
   week_of_month: number | null
   start_time: string | null
@@ -95,7 +94,6 @@ const emit = defineEmits<{ close: []; saved: [] }>()
 const form = useForm<ScheduleForm>({
   label: '',
   frequency: null,
-  frequency_detail: '',
   weekdays: [],
   week_of_month: null,
   start_time: '',
@@ -121,7 +119,6 @@ watch(
     form.defaults({
       label: schedule.label ?? '',
       frequency: schedule.frequency,
-      frequency_detail: schedule.frequency_detail ?? '',
       weekdays: [...(schedule.weekdays ?? [])],
       week_of_month: schedule.week_of_month,
       start_time: schedule.start_time ?? '',

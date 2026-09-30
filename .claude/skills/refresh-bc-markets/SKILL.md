@@ -48,14 +48,15 @@ the table in `getting-the-baseline.md` shows.)
 
 ## Backfilling schedule structure
 
-Many schedules predate the structured day/time fields. They have only
-free-text `frequency_detail` and null `weekdays`/`start_time`/`end_time`,
-so they don't appear on the admin calendar. **On every market you touch,
+Some schedules still lack the structured day/time fields (a wording the
+one-time conversion of the old free-text field couldn't parse ends up whole in
+the schedule's notes). With null `weekdays`/`start_time`/`end_time` they
+don't appear on the admin calendar. **On every market you touch,
 deep-parse any schedule that's missing that structure.** Use the rules and
 worked examples in `find-bc-markets/references/market-xml-schema.md` →
 "Deep-parsing schedules". Parse from the current source you just checked
-when there is one, or from the baseline `frequency_detail` when the
-schedule is reconfirmed unchanged.
+when there is one, or from the baseline `<notes>` when the schedule is
+reconfirmed unchanged.
 
 Split a schedule when the rules call for it. For example, a
 "Wed 4-7, Sat 9-1" row becomes two schedules. Splitting replaces the

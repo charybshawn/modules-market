@@ -164,7 +164,6 @@ class Market extends Model
         return $this->schedules()->get()->map(fn (MarketSchedule $s) => [
             'label' => $s->label,
             'frequency' => $s->frequency,
-            'frequency_detail' => $s->frequency_detail,
             'weekdays' => $s->weekdays,
             'week_of_month' => $s->week_of_month,
             'start_time' => $s->start_time,

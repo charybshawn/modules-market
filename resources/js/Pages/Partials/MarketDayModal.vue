@@ -78,7 +78,6 @@ export interface MarketDayOccurrence {
   date: string
   start_time: string | null
   end_time: string | null
-  frequency_detail: string | null
   address: string | null
   liveness_score: number
 }

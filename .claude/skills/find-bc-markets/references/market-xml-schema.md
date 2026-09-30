@@ -53,10 +53,11 @@ seasonal
 other
 ```
 
-Pick the closest bucket, then put the actual human-readable detail — days,
-hours — in the schedule's `<frequency_detail>` regardless of which bucket you
-picked. `frequency_detail` is where the real information lives; `frequency`
-is just a coarse filter.
+Pick the closest bucket, then put the actual days and hours in the schedule's
+`<weekdays>`, `<start_time>` and `<end_time>`; `frequency` is just a coarse
+filter. Everything else the source says about the schedule (entry fee, vendor
+count, closures) goes in the schedule's `<notes>`. There is no separate
+"days and hours" text field.
 
 ## Field reference
 
@@ -121,25 +122,27 @@ markets will have just one.
 |---|---|
 | `label` | Optional. "Summer Market", "Winter Market", "Christmas Craft Fair". |
 | `frequency` | One of the controlled list above. |
-| `frequency_detail` | Free text — the source's own wording for days and hours, kept close to verbatim. Still written even when the structured fields below are filled: it carries the nuance they can't ("closed Thanksgiving weekend", "until sold out"). |
 | `weekdays` | Comma-separated day keys: `sun,mon,tue,wed,thu,fri,sat`. The day(s) the market runs. **This is what puts a market on the admin calendar** — see "Deep-parsing schedules" below. Omit for `one_time`. |
 | `week_of_month` | `1`-`4`, or `last`. Only for `frequency` = `monthly` ("2nd Saturday" → `2`, "last Sunday" → `last`). Ignored for any other frequency. |
 | `start_time` / `end_time` | 24-hour `HH:MM` ("8:30am" → `08:30`, "12:30pm" → `12:30`, "5pm" → `17:00`). One pair per schedule. |
 | `start_date` / `end_date` | `YYYY-MM-DD`. Only when the source actually states the year — leave them out rather than guessing one (e.g. a site saying "starts March 23" with no year). |
 | `address_line1` | Only when this schedule is held somewhere other than the market's own address. |
-| `notes` | Anything uncertain about this schedule specifically. |
+| `notes` | Wording that isn't a day or an hour: entry fee, vendor count, "closed Thanksgiving weekend", "until sold out". Also anything uncertain about this schedule specifically. |
 | `liveness_score` | **Required.** `0`-`4`, scored per schedule (see SKILL.md step 6). A schedule without a valid one is skipped on import and reported, not imported with a guess. |
 | `liveness_checked_at` | Same rules as on `<market>`: defaults to the import date; leave it out normally. |
 
 ## Deep-parsing schedules
 
 The admin calendar places a market on actual days using `weekdays`,
-`week_of_month`, `start_time` and `end_time` — **not** `frequency_detail`,
-which is only displayed. A schedule with no `<weekdays>` (or, for `monthly`,
-no `<week_of_month>`) is imported fine but lands in the calendar's "Not on
-the calendar yet" list. So for every schedule, parse the source's days and
-hours all the way down to these fields, and keep the source's own wording in
-`frequency_detail` alongside them.
+`week_of_month`, `start_time` and `end_time`. A schedule with no
+`<weekdays>` (or, for `monthly`, no `<week_of_month>`) is imported fine but
+lands in the calendar's "Not on the calendar yet" list. So for every
+schedule, parse the source's days and hours all the way down to these fields,
+and put whatever wording is left over in `<notes>`.
+
+A legacy `<frequency_detail>` element in an older file is still accepted on
+import: its days and hours fill any of these fields the file left empty, and
+the remaining wording is appended to the notes. Don't write it in new files.
 
 Rules:
 
@@ -168,10 +171,10 @@ Rules:
   season in `start_date`/`end_date` when the year is stated.
 - **Time words:** "noon" → `12:00`, "midnight" → `00:00`. Fuzzy ends ("until
   dusk", "until sold out", "till 2ish") get no `end_time`; the wording
-  stays in `frequency_detail`.
+  goes in `<notes>`.
 - **Exceptions stay in text.** Skipped dates, holiday closures and "weather
-  permitting" go in `frequency_detail` or `<notes>`. The structured fields
-  describe the normal pattern.
+  permitting" go in `<notes>`. The structured fields describe the normal
+  pattern.
 
 Worked examples:
 
@@ -218,7 +221,6 @@ before handing a file off — it should report `text/xml`, not `text/plain`.
       <schedule>
         <label>Summer Market</label>
         <frequency>weekly</frequency>
-        <frequency_detail>Saturdays 8:30am-12:30pm</frequency_detail>
         <weekdays>sat</weekdays>
         <start_time>08:30</start_time>
         <end_time>12:30</end_time>

@@ -6,10 +6,12 @@ use App\Actions\GetSiteSetting;
 use App\Http\Controllers\Controller;
 use Cultpantry\Market\Actions\ExportMarketsToPdf;
 use Cultpantry\Market\Actions\ExportMarketsToXml;
+use Cultpantry\Market\Actions\FetchMarkets;
 use Cultpantry\Market\Actions\ImportMarketsFromXml;
 use Cultpantry\Market\Contracts\MarketHistory;
 use Cultpantry\Market\Events\MarketRecordDeleted;
 use Cultpantry\Market\Events\MarketRecordSaved;
+use Cultpantry\Market\Http\Resources\MarketResource;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Models\MarketSchedule;
 use Cultpantry\Market\Support\MarketEventPresenter;
@@ -49,17 +51,27 @@ class MarketController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index(): Response
+    /**
+     * One page of the list, under whatever search, chips, schedule and
+     * liveness filters and sort the page sent. The page infinite-scrolls: it
+     * asks for ?page=N again as the sentinel comes into view and appends.
+     */
+    public function index(Request $request, FetchMarkets $fetchMarkets): Response
     {
         $this->authorize('viewAny', Market::class);
 
-        $markets = Market::with('schedules')->orderBy('name')->get();
+        $filters = $request->validate($this->listFilterRules());
 
         return Inertia::render('Vendor/market/Index', [
-            'markets' => $markets,
-            'cities' => $this->knownValues('city'),
+            'markets' => MarketResource::collection($fetchMarkets->handle($filters)),
+            'filters' => $filters,
+            'counts' => fn () => [
+                'total' => Market::count(),
+                'active' => Market::where('is_active', true)->count(),
+            ],
+            'cities' => fn () => $this->knownValues('city'),
             'regions' => Market::REGIONS,
-            'marketTypes' => $this->knownValues('market_type'),
+            'marketTypes' => fn () => $this->knownValues('market_type'),
             'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
@@ -126,7 +138,7 @@ class MarketController extends Controller implements HasMiddleware
                     'city' => $s->market->city,
                     'label' => $s->label,
                     'frequency' => $s->frequency,
-                    'frequency_detail' => $s->frequency_detail,
+                    'notes' => $s->notes,
                 ])->values(),
             'filters' => ['region' => $filters['region'] ?? '', 'city' => $filters['city'] ?? ''],
             'regions' => Market::REGIONS,
@@ -419,30 +431,63 @@ class MarketController extends Controller implements HasMiddleware
      * plain-<a>-not-<Link> requirement as export() above, for the same
      * reason.
      */
-    public function exportPdf(Request $request, ExportMarketsToPdf $exportMarketsToPdf): \Illuminate\Http\Response
+    public function exportPdf(Request $request, ExportMarketsToPdf $exportMarketsToPdf, FetchMarkets $fetchMarkets): \Illuminate\Http\Response
     {
         $this->authorize('export', Market::class);
 
-        $validated = $request->validate([
-            'ids' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validate($this->listFilterRules() + ['ids' => ['nullable', 'string']]);
 
-        $query = Market::with('schedules')->orderBy('name');
-
-        // No ids at all (rather than an empty string) means "export
-        // everything" -- e.g. a direct link with no filter state to report,
-        // same fallback as export()'s own full-table XML dump.
-        if (array_key_exists('ids', $validated) && $validated['ids'] !== null) {
+        // The list page sends its own search and filters, so the PDF holds
+        // exactly what that list matches (all pages, not just the ones
+        // scrolled into view). A bare link with no filter state at all means
+        // "export everything", same fallback as export()'s full XML dump.
+        if (! empty($validated['ids'])) {
             $ids = array_filter(array_map('trim', explode(',', $validated['ids'])), fn ($id) => ctype_digit($id));
-            $query->whereIn('id', $ids);
+            $markets = Market::with('schedules')->whereIn('id', $ids)->orderBy('name')->get();
+        } elseif ($request->hasAny(['search', 'status', 'city', 'region', 'market_type', 'freq_include', 'freq_exclude', 'months', 'liveness_min', 'liveness_max'])) {
+            $markets = $fetchMarkets->all($validated);
+        } else {
+            $markets = Market::with('schedules')->orderBy('name')->get();
         }
 
-        $pdf = $exportMarketsToPdf->handle($query->get());
+        $pdf = $exportMarketsToPdf->handle($markets);
         $filename = 'markets-'.Carbon::today()->toDateString().'.pdf';
 
         return response($pdf)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+    }
+
+    /**
+     * The list page's query string: search, the chips, the schedule and
+     * liveness filters, sort and page. Shared by index() and exportPdf() so
+     * the PDF is built from exactly what the list was showing.
+     */
+    private function listFilterRules(): array
+    {
+        return [
+            'search' => ['nullable', 'string', 'max:200'],
+            'status' => ['nullable', Rule::in(['active', 'inactive', 'all'])],
+            'city' => ['nullable', 'array'],
+            'city.*' => ['string', 'max:255'],
+            'region' => ['nullable', 'array'],
+            'region.*' => ['string', 'max:255'],
+            'market_type' => ['nullable', 'array'],
+            'market_type.*' => ['string', 'max:255'],
+            'sort' => ['nullable', Rule::in(FetchMarkets::SORTABLE)],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+            'freq_include' => ['nullable', 'array'],
+            'freq_include.*' => [Rule::in(array_keys(Market::FREQUENCIES))],
+            'freq_exclude' => ['nullable', 'array'],
+            'freq_exclude.*' => [Rule::in(array_keys(Market::FREQUENCIES))],
+            'months' => ['nullable', 'array'],
+            'months.*' => ['integer', 'between:1,12'],
+            'match' => ['nullable', Rule::in(['all', 'any'])],
+            'liveness_min' => ['nullable', 'integer', 'between:0,4'],
+            'liveness_max' => ['nullable', 'integer', 'between:0,4'],
+            'liveness_unchecked' => ['nullable', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ];
     }
 
     /**
@@ -506,7 +551,6 @@ class MarketController extends Controller implements HasMiddleware
         return [
             'label' => ['nullable', 'string', 'max:255'],
             'frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
-            'frequency_detail' => ['nullable', 'string'],
             'weekdays' => ['nullable', 'array'],
             'weekdays.*' => ['integer', 'between:0,6'],
             'week_of_month' => ['nullable', Rule::in(array_keys(MarketSchedule::WEEKS_OF_MONTH))],

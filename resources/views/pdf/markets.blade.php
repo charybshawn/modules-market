@@ -103,6 +103,11 @@
             margin-right: 5px;
         }
 
+        .schedule-sub {
+            text-indent: 0;
+            color: #4b5563;
+        }
+
         .contact-line {
             margin-top: 5px;
             font-size: 9px;
@@ -159,11 +164,20 @@
                 @if ($market->schedules->isNotEmpty())
                     <div class="schedules">
                         @foreach ($market->schedules as $schedule)
+                            @php
+                                $when = $schedule->recurrenceSummary();
+                                $title = $schedule->label ?: ($when ?: ($frequencyLabels[$schedule->frequency] ?? 'Schedule'));
+                            @endphp
                             <div class="schedule-line">
-                                @if ($schedule->label)<strong>{{ $schedule->label }}:</strong>@endif
-                                {{ $schedule->frequency_detail ?: ($frequencyLabels[$schedule->frequency] ?? 'Schedule') }}
+                                <strong>{{ $title }}</strong>
                                 @if ($schedule->start_date)
-                                    ({{ $schedule->start_date->format('M j') }}@if ($schedule->end_date && ! $schedule->end_date->equalTo($schedule->start_date)) &ndash; {{ $schedule->end_date->format('M j, Y') }}@else, {{ $schedule->start_date->format('Y') }}@endif)
+                                    <div class="schedule-sub">{{ $schedule->start_date->format('M j') }}@if ($schedule->end_date && ! $schedule->end_date->equalTo($schedule->start_date)) &ndash; {{ $schedule->end_date->format('M j, Y') }}@else, {{ $schedule->start_date->format('Y') }}@endif</div>
+                                @endif
+                                @if ($when && $title !== $when)
+                                    <div class="schedule-sub">{{ $when }}</div>
+                                @endif
+                                @if ($schedule->notes)
+                                    <div class="schedule-sub">{{ $schedule->notes }}</div>
                                 @endif
                             </div>
                         @endforeach

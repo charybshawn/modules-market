@@ -87,7 +87,7 @@
               <div class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ row.market_name }}<span v-if="row.label" class="font-normal text-gray-500 dark:text-gray-400"> · {{ row.label }}</span>
               </div>
-              <div class="text-xs text-gray-500 dark:text-gray-400">{{ [row.city, row.frequency_detail].filter(Boolean).join(' · ') || 'No details' }}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">{{ [row.city, row.notes].filter(Boolean).join(' · ') || 'No details' }}</div>
             </Link>
           </li>
         </ul>
@@ -137,7 +137,7 @@ interface UnscheduledRow {
   city: string | null
   label: string | null
   frequency: string | null
-  frequency_detail: string | null
+  notes: string | null
 }
 
 const props = defineProps<{

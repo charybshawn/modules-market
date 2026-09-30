@@ -5,6 +5,7 @@ namespace Cultpantry\Market\Actions;
 use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Models\MarketSchedule;
+use Cultpantry\Market\Support\LegacyScheduleDetail;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -204,20 +205,35 @@ class ImportMarketsFromXml
             }
 
             $frequency = $this->frequency($schedule);
+            $startDate = $this->date($schedule, 'start_date');
+            $endDate = $this->date($schedule, 'end_date');
+
+            // Older files carry the retired free-text <frequency_detail>
+            // ("Saturday, 10am-7pm, $5 entry"). Fill any days/hours the file
+            // left structured-empty from it and keep the rest as a note; the
+            // structured elements always win when both are given.
+            $legacy = LegacyScheduleDetail::apply(
+                $this->text($schedule, 'frequency_detail'),
+                $frequency,
+                $startDate !== null || $endDate !== null,
+                $this->weekdays($schedule),
+                $this->time($schedule, 'start_time'),
+                $this->time($schedule, 'end_time'),
+            );
+
             $schedules[] = [
                 'label' => $this->text($schedule, 'label'),
                 'frequency' => $frequency,
-                'frequency_detail' => $this->text($schedule, 'frequency_detail'),
-                'weekdays' => $this->weekdays($schedule),
+                'weekdays' => $legacy['weekdays'],
                 // Mirrors MarketSchedule's saving hook, so the unchanged
                 // check below compares like with like.
                 'week_of_month' => $frequency === 'monthly' ? $this->weekOfMonth($schedule) : null,
-                'start_time' => $this->time($schedule, 'start_time'),
-                'end_time' => $this->time($schedule, 'end_time'),
-                'start_date' => $this->date($schedule, 'start_date'),
-                'end_date' => $this->date($schedule, 'end_date'),
+                'start_time' => $legacy['start_time'],
+                'end_time' => $legacy['end_time'],
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'address_line1' => $this->text($schedule, 'address_line1'),
-                'notes' => $this->text($schedule, 'notes'),
+                'notes' => LegacyScheduleDetail::mergeNotes($this->text($schedule, 'notes'), $legacy['note']),
                 'liveness_score' => $score,
                 'liveness_checked_at' => $this->livenessCheckedAt($schedule, $score),
             ];
@@ -328,9 +344,7 @@ class ImportMarketsFromXml
 
     /**
      * Falls back to 'other' for a value outside Market::FREQUENCIES rather
-     * than dropping it silently -- the schedule still imports, and
-     * frequency_detail (free text) still carries whatever the source XML
-     * actually said either way.
+     * than dropping it silently -- the schedule still imports.
      */
     private function frequency(SimpleXMLElement $node): ?string
     {

@@ -83,7 +83,6 @@ class ExportMarketsToXml
 
         $this->addChild($node, 'label', $schedule->label);
         $this->addChild($node, 'frequency', $schedule->frequency);
-        $this->addChild($node, 'frequency_detail', $schedule->frequency_detail);
         if (! empty($schedule->weekdays)) {
             $this->addChild($node, 'weekdays', collect($schedule->weekdays)->map(fn (int $d) => MarketSchedule::WEEKDAYS[$d])->implode(','));
         }

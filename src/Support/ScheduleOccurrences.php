@@ -163,7 +163,6 @@ class ScheduleOccurrences
             'date' => null,
             'start_time' => $schedule->start_time,
             'end_time' => $schedule->end_time,
-            'frequency_detail' => $schedule->frequency_detail,
             'address' => $schedule->address_line1 ?? $market->address_line1,
             'liveness_score' => $schedule->liveness_score,
         ];

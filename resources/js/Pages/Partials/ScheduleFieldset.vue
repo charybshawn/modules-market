@@ -52,11 +52,6 @@
     </div>
   </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Days &amp; Hours note</label>
-    <textarea v-model="schedule.frequency_detail" rows="2" placeholder="e.g. Saturdays 9am-1pm, closed long weekends" :class="inputClass"></textarea>
-  </div>
-
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div>
       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Starts</label>
@@ -75,7 +70,7 @@
 
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notes</label>
-    <textarea v-model="schedule.notes" rows="2" :class="inputClass"></textarea>
+    <textarea v-model="schedule.notes" rows="2" placeholder="e.g. Closed long weekends. $5 entry. 70+ vendors." :class="inputClass"></textarea>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -107,7 +102,6 @@ import { WEEKDAY_NAMES } from './scheduleSummary'
 export interface ScheduleForm {
   label: string
   frequency: string | null
-  frequency_detail: string
   // 0 = Sunday ... 6 = Saturday, same as MarketSchedule::WEEKDAYS.
   weekdays: number[]
   week_of_month: number | null
