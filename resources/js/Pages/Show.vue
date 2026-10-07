@@ -22,96 +22,113 @@
           >{{ unignoring ? 'Un-ignoring...' : 'Un-ignore' }}</button>
         </div>
 
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
-          <div class="min-w-0 flex-1 space-y-2">
-            <!-- Name is only inline-editable on desktop: on mobile the name
-                 lives in AdminMobileHeader above, a separate shared
-                 component whose title is a static string set at page load,
-                 not worth wiring up for one field here. -->
-            <div class="hidden md:block">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+          <!-- Stacked on mobile (name, status, then full-width actions);
+               side by side from md, with the actions pinned top-right. -->
+          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="min-w-0 flex-1">
+              <!-- Shown on mobile too, although AdminMobileHeader repeats
+                   it: the header truncates to one line, this wraps. -->
               <InlineField
                 label="Name"
                 :model-value="market.name"
-                value-class="text-2xl font-semibold text-gray-900 dark:text-white"
+                value-class="text-xl md:text-2xl font-semibold leading-tight text-gray-900 dark:text-white"
                 :on-save="(v) => saveField('name', v)"
               />
+
+              <!-- Liveness and its checked-on date share one wrapper so a
+                   wrap at phone width never leaves "checked" on a row of
+                   its own. -->
+              <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <button
+                  type="button"
+                  class="tap-target-touch inline-flex items-center disabled:opacity-50"
+                  :disabled="togglingActive"
+                  :title="market.is_active ? 'Mark inactive' : 'Mark active'"
+                  @click="toggleActive"
+                >
+                  <span
+                    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+                    :class="market.is_active
+                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30'
+                      : 'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-700/60 dark:text-gray-300 dark:ring-gray-600'"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full" :class="market.is_active ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-500'"></span>
+                    {{ market.is_active ? 'Active' : 'Inactive' }}
+                  </span>
+                </button>
+                <span class="inline-flex flex-wrap items-center gap-x-1.5 text-gray-700 dark:text-gray-300">
+                  <span v-if="market.liveness_score !== null" class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(market.liveness_score)"></span>
+                  <InlineField
+                    label="Liveness Score"
+                    type="select"
+                    :model-value="market.liveness_score"
+                    :display-value="market.liveness_score !== null ? `${market.liveness_score}/4 · ${livenessLabel(market.liveness_score)}` : null"
+                    :options="livenessOptions"
+                    placeholder="Liveness not checked"
+                    :on-save="(v) => saveField('liveness_score', v)"
+                  />
+                  <span v-if="market.liveness_score !== null" class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500">
+                    · checked
+                    <InlineField
+                      label="Checked On"
+                      type="date"
+                      :model-value="market.liveness_checked_at?.slice(0, 10) ?? null"
+                      :display-value="formatDate(market.liveness_checked_at)"
+                      value-class="text-sm text-gray-400 dark:text-gray-500"
+                      :on-save="(v) => saveField('liveness_checked_at', v)"
+                    />
+                  </span>
+                </span>
+              </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
-              <InlineField label="City" :model-value="market.city" :datalist-options="props.cities" :on-save="(v) => saveField('city', v)" />
-              <span
-                v-if="props.locationStatus !== 'ok'"
-                class="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30"
-                :title="props.locationStatus === 'no_city' ? 'No city is set, so this market can\'t be found by distance.' : 'This city isn\'t in the places list, so this market can\'t be found by distance.'"
-              >{{ props.locationStatus === 'no_city' ? 'No city' : 'Town not found' }}</span>
-              <span class="text-gray-300 dark:text-gray-600">·</span>
-              <InlineField label="Region" type="select" :model-value="market.region" :options="regionOptions" :on-save="(v) => saveField('region', v)" />
-              <span class="text-gray-300 dark:text-gray-600">·</span>
-              <InlineField label="Market Type" :model-value="market.market_type" :datalist-options="props.marketTypes" :on-save="(v) => saveField('market_type', v)" />
-            </div>
-
-            <p class="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-              <span v-if="market.sponsor">Sponsored by</span>
-              <InlineField label="Sponsor" :model-value="market.sponsor" placeholder="Add a sponsor" :on-save="(v) => saveField('sponsor', v)" />
-            </p>
-
-            <!-- flex-col on mobile: Active, the liveness score and the
-                 checked-on date are three separate tap targets that don't
-                 comfortably share one line at phone width -- wrapping mid-
-                 line (the sm:flex-row default) put "· checked" on its own
-                 half-empty row, which read as broken rather than just
-                 wrapped. Stacked, each gets its own full-width line. -->
-            <div class="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-3 gap-y-1 text-sm">
+            <div class="flex items-center gap-2 md:shrink-0">
+              <Link
+                :href="route('admin.market.index')"
+                class="tap-target-touch hidden md:inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >&larr; Back</Link>
               <button
+                v-if="!market.ignored_at"
                 type="button"
-                class="tap-target-touch inline-flex items-center gap-1.5 font-medium disabled:opacity-50"
-                :class="market.is_active ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'"
-                :disabled="togglingActive"
-                @click="toggleActive"
-              >
-                <span class="w-2 h-2 rounded-full flex-shrink-0" :class="market.is_active ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-500'"></span>
-                {{ market.is_active ? 'Active' : 'Inactive' }}
-              </button>
-              <span class="inline-flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                <span v-if="market.liveness_score !== null" class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(market.liveness_score)"></span>
-                <InlineField
-                  label="Liveness Score"
-                  type="select"
-                  :model-value="market.liveness_score"
-                  :display-value="market.liveness_score !== null ? `${market.liveness_score}/4 · ${livenessLabel(market.liveness_score)}` : null"
-                  :options="livenessOptions"
-                  placeholder="Liveness not checked"
-                  :on-save="(v) => saveField('liveness_score', v)"
-                />
-              </span>
-              <span v-if="market.liveness_score !== null" class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500">
-                · checked
-                <InlineField
-                  label="Checked On"
-                  type="date"
-                  :model-value="market.liveness_checked_at?.slice(0, 10) ?? null"
-                  :display-value="formatDate(market.liveness_checked_at)"
-                  :on-save="(v) => saveField('liveness_checked_at', v)"
-                />
-              </span>
+                class="tap-target-touch flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                @click="showIgnore = true"
+              >Ignore</button>
+              <Link
+                :href="route('admin.market.edit', market.id)"
+                class="tap-target-touch flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+              >Edit</Link>
             </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <Link
-              :href="route('admin.market.index')"
-              class="tap-target-touch hidden md:inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >&larr; Back</Link>
-            <button
-              v-if="!market.ignored_at"
-              type="button"
-              class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-              @click="showIgnore = true"
-            >Ignore</button>
-            <Link
-              :href="route('admin.market.edit', market.id)"
-              class="tap-target-touch inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-            >Edit</Link>
-          </div>
+
+          <!-- The market's key facts as a labelled grid rather than a
+               dotted run of values: an empty one still reads as "—" under
+               its label instead of disappearing from the line. -->
+          <dl class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+            <div class="min-w-0">
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">City</dt>
+              <dd class="mt-1">
+                <InlineField label="City" :model-value="market.city" :datalist-options="props.cities" :on-save="(v) => saveField('city', v)" />
+                <span
+                  v-if="props.locationStatus !== 'ok'"
+                  class="mt-1 inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30"
+                  :title="props.locationStatus === 'no_city' ? 'No city is set, so this market can\'t be found by distance.' : 'This city isn\'t in the places list, so this market can\'t be found by distance.'"
+                >{{ props.locationStatus === 'no_city' ? 'No city' : 'Town not found' }}</span>
+              </dd>
+            </div>
+            <div class="min-w-0">
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Region</dt>
+              <dd class="mt-1"><InlineField label="Region" type="select" :model-value="market.region" :options="regionOptions" :on-save="(v) => saveField('region', v)" /></dd>
+            </div>
+            <div class="min-w-0">
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Type</dt>
+              <dd class="mt-1"><InlineField label="Market Type" :model-value="market.market_type" :datalist-options="props.marketTypes" :on-save="(v) => saveField('market_type', v)" /></dd>
+            </div>
+            <div class="min-w-0">
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sponsor</dt>
+              <dd class="mt-1"><InlineField label="Sponsor" :model-value="market.sponsor" :on-save="(v) => saveField('sponsor', v)" /></dd>
+            </div>
+          </dl>
         </div>
 
         <div class="p-6 space-y-8">
