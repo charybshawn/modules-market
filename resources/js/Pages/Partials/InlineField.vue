@@ -1,10 +1,12 @@
 <template>
   <div>
-    <!-- Read state: a small, always-visible (not hover-only, so it works on
-         touch) pencil button next to the value, rather than making the whole
-         row the click target -- several fields render their value as a real
-         link (tel:/mailto:/website), and a row-wide click target would fight
-         with actually following that link. -->
+    <!-- Read state: a small, always-visible (not hover-only) pencil button
+         next to the value, rather than making the whole row the click target
+         -- several fields render their value as a real link
+         (tel:/mailto:/website), and a row-wide click target would fight with
+         actually following that link. Desktop only: on mobile the page is
+         read-only and edits go through the full Edit page. Hidden with CSS
+         rather than a JS breakpoint check so server rendering matches. -->
     <div v-if="!editing" class="flex items-start gap-1.5">
       <div class="min-w-0 flex-1 break-words" :class="displayValue ? valueClass : `${emptyValueClass} italic`">
         <template v-if="linkifyLines && displayValue">
@@ -24,7 +26,7 @@
       </div>
       <button
         type="button"
-        class="tap-target-touch shrink-0 text-gray-300 hover:text-indigo-600 dark:text-gray-600 dark:hover:text-indigo-400"
+        class="tap-target-touch hidden md:block shrink-0 text-gray-300 hover:text-indigo-600 dark:text-gray-600 dark:hover:text-indigo-400"
         :aria-label="`Edit ${label}`"
         @click="startEdit"
       >
