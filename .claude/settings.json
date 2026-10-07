@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan test *)",
+      "Bash(npx vue-tsc --noEmit *)",
+      "Bash(php -l *)",
+      "Bash(php artisan route:list *)",
+      "Bash(php artisan migrate:status *)",
+      "Bash(vendor/bin/pint --test *)",
+      "Bash(vendor/bin/pest *)",
+      "Bash(php artisan schedule:list *)",
+      "Bash(php artisan config:show *)",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__read_network_requests",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__list_connected_browsers",
+      "mcp__laravel-boost__database-query"
+    ]
+  }
+}
