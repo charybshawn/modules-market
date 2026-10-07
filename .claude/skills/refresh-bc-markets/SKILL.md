@@ -104,6 +104,15 @@ the user can fill it in by hand.
      live. If the user explicitly wants inactive markets checked
      thoroughly (e.g. "did any of the closed ones come back"), do the full
      pass on those instead.
+   - **Ignored markets are skipped entirely** (see "Ignored markets" in
+     `getting-the-baseline.md` for how to tell which they are) unless the
+     user asks for them by name. Ignoring is the user's own "not relevant
+     to us" decision -- separate from `is_active`, which tracks whether a
+     market still runs -- so there's no point spending research effort on
+     them. List them in the summary as "Ignored, not checked: N". If one is
+     included in an XML anyway, the import still updates it and it stays
+     ignored. Never suggest un-ignoring a market because it looks active;
+     that call is the user's, made on the market's own page.
 
 3. **Check each market across the relevant platforms.** Not every platform
    for every market -- use what the baseline row already points to, and

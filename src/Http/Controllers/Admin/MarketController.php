@@ -79,7 +79,7 @@ class MarketController extends Controller implements HasMiddleware
             'places' => fn () => Places::options($this->knownValues('city')),
             'counts' => fn () => [
                 'total' => Market::count(),
-                'active' => Market::where('is_active', true)->count(),
+                'active' => Market::where('is_active', true)->notIgnored()->count(),
             ],
             'cities' => fn () => $this->knownValues('city'),
             'regions' => Market::REGIONS,
@@ -114,6 +114,7 @@ class MarketController extends Controller implements HasMiddleware
 
         $activeMarkets = function ($query) use ($filters) {
             $query->where('is_active', true)
+                ->notIgnored()
                 ->when($filters['region'] ?? null, fn ($q, $region) => $q->where('region', $region))
                 ->when($filters['city'] ?? null, fn ($q, $city) => $q->where('city', $city));
         };
@@ -356,6 +357,39 @@ class MarketController extends Controller implements HasMiddleware
         return redirect()->route('admin.market.show', $market)->with('success', 'Schedule updated.');
     }
 
+    /**
+     * The market page's Ignore / Un-ignore. The only place ignored_at and
+     * ignored_reason change (they're not fillable), so an import or the Edit
+     * form can never undo it. Re-ignoring an ignored market keeps its
+     * original date and just updates the reason.
+     */
+    public function ignore(Request $request, Market $market): RedirectResponse
+    {
+        $this->authorize('update', $market);
+
+        $validated = $request->validate([
+            'ignored' => ['required', 'boolean'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $before = $market->getAttributes();
+        $schedulesBefore = $market->scheduleSnapshot();
+
+        $market->forceFill($validated['ignored']
+            ? ['ignored_at' => $market->ignored_at ?? now(), 'ignored_reason' => $validated['reason'] ?? null]
+            : ['ignored_at' => null, 'ignored_reason' => null])->save();
+
+        $event = MarketRecordSaved::forUpdated($market, $before, $schedulesBefore, auth()->id());
+        if ($event->changes !== []) {
+            event($event);
+        }
+
+        return redirect()->route('admin.market.show', $market)->with(
+            'success',
+            $validated['ignored'] ? 'Market ignored -- hidden from the list and calendar.' : 'Market is no longer ignored.',
+        );
+    }
+
     public function destroy(Market $market): RedirectResponse
     {
         $this->authorize('delete', $market);
@@ -398,6 +432,9 @@ class MarketController extends Controller implements HasMiddleware
         }
         if ($result['schedules_skipped'] > 0) {
             $message .= " Skipped {$result['schedules_skipped']} schedule".($result['schedules_skipped'] === 1 ? '' : 's')." missing a valid liveness score (0-4).";
+        }
+        if ($result['ignored_updated'] > 0) {
+            $message .= " {$result['ignored_updated']} of the updated market".($result['ignored_updated'] === 1 ? ' is' : 's are').' ignored and stay'.($result['ignored_updated'] === 1 ? 's' : '').' hidden.';
         }
         if ($result['deactivated'] > 0) {
             $message .= " Marked {$result['deactivated']} market".($result['deactivated'] === 1 ? '' : 's').' inactive (liveness score '.Market::DEACTIVATE_AT_OR_BELOW.' or below).';
@@ -483,7 +520,8 @@ class MarketController extends Controller implements HasMiddleware
     {
         return [
             'search' => ['nullable', 'string', 'max:200'],
-            'status' => ['nullable', Rule::in(['active', 'inactive', 'all'])],
+            // 'all', or one or more of FetchMarkets::STATUSES joined by commas.
+            'status' => ['nullable', 'regex:/^(all|(active|inactive|ignored)(,(active|inactive|ignored))*)$/'],
             'city' => ['nullable', 'array'],
             'city.*' => ['string', 'max:255'],
             'region' => ['nullable', 'array'],

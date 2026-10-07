@@ -37,6 +37,8 @@ class MarketEventPresenter
         'liveness_score' => 'Liveness score',
         'liveness_checked_at' => 'Liveness checked on',
         'is_active' => 'Active',
+        'ignored_at' => 'Ignored',
+        'ignored_reason' => 'Ignore reason',
         'schedules' => 'Schedules',
     ];
 
@@ -102,6 +104,9 @@ class MarketEventPresenter
 
     private static function value(string $field, mixed $value): string
     {
+        if ($field === 'ignored_at') {
+            return $value ? 'Ignored' : 'Not ignored';
+        }
         if ($value === null || $value === '') {
             return '(empty)';
         }

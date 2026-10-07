@@ -27,6 +27,8 @@ class MarketResource extends JsonResource
             'sponsor' => $this->sponsor,
             'phone' => $this->phone,
             'is_active' => (bool) $this->is_active,
+            // Ignored wins: it's the admin's own call, whatever the liveness says.
+            'status' => $this->isIgnored() ? 'ignored' : ($this->is_active ? 'active' : 'inactive'),
             'liveness_score' => $this->liveness_score,
             'liveness_checked_at' => $this->liveness_checked_at?->toDateString(),
             // 'ok', 'no_city' or 'unknown_town': whether a drive-time search can

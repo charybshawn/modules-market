@@ -3,6 +3,7 @@
 namespace Cultpantry\Market\Models;
 
 use Cultpantry\Market\Support\Places;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -31,6 +32,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $liveness_score 0-4, see Market::LIVENESS_LABELS
  * @property \Illuminate\Support\Carbon|null $liveness_checked_at
  * @property bool $is_active
+ * @property \Illuminate\Support\Carbon|null $ignored_at set = ignored; see isIgnored()
+ * @property string|null $ignored_reason
  */
 class Market extends Model
 {
@@ -159,6 +162,7 @@ class Market extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'ignored_at' => 'datetime',
         'liveness_score' => 'integer',
         'liveness_checked_at' => 'date',
     ];
@@ -203,6 +207,24 @@ class Market extends Model
             Places::find($this->city) === null => 'unknown_town',
             default => 'ok',
         };
+    }
+
+    /**
+     * Ignored is the admin's own "not relevant to us", independent of
+     * is_active: an ignored market is hidden from the list's default view
+     * and the calendar, but imports still update it. ignored_at and
+     * ignored_reason are deliberately not fillable -- only the market
+     * page's Ignore action (MarketController::ignore) sets or clears them,
+     * so neither the Edit form nor an XML import can undo the decision.
+     */
+    public function isIgnored(): bool
+    {
+        return $this->ignored_at !== null;
+    }
+
+    public function scopeNotIgnored(Builder $query): void
+    {
+        $query->whereNull('ignored_at');
     }
 
     public function schedules(): HasMany

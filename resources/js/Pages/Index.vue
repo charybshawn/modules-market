@@ -206,7 +206,7 @@
             <div class="min-w-0">
               <div class="flex items-center gap-3 min-w-0">
                 <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.name }}</span>
-                <span v-if="!item.is_active" class="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">Inactive</span>
+                <span v-if="item.status !== 'active'" class="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">{{ statusLabel(item.status) }}</span>
                 <span v-if="item.location_status !== 'ok'" :class="[badgeClass, 'shrink-0']" :title="locationHint(item.location_status)">{{ locationLabel(item.location_status) }}</span>
                 <span class="shrink-0 truncate max-w-[40%] text-sm text-gray-500 dark:text-gray-400">{{ item.city ?? '—' }}</span>
                 <span v-if="item.drive_minutes != null" class="shrink-0 text-sm font-medium tabular-nums text-gray-900 dark:text-white">{{ formatDrive(item.drive_minutes) }}</span>
@@ -218,7 +218,7 @@
           <template #cell-name="{ item }">
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               {{ item.name }}
-              <span v-if="!item.is_active" class="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">(Inactive)</span>
+              <span v-if="item.status !== 'active'" class="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">({{ statusLabel(item.status) }})</span>
               <span v-if="item.location_status !== 'ok'" :class="[badgeClass, 'ml-1.5 align-middle']" :title="locationHint(item.location_status)">{{ locationLabel(item.location_status) }}</span>
             </div>
             <div v-if="item.sponsor" class="text-xs text-gray-400 dark:text-gray-500">{{ item.sponsor }}</div>
@@ -318,6 +318,8 @@ interface MarketRow {
   liveness_score: number | null
   liveness_checked_at: string | null
   is_active: boolean
+  // Ignored wins over is_active (set by MarketResource).
+  status: 'active' | 'inactive' | 'ignored'
   location_status: 'ok' | 'no_city' | 'unknown_town'
   drive_minutes: number | null
   drive_km: number | null
@@ -325,7 +327,8 @@ interface MarketRow {
 
 interface MarketFilters {
   search?: string
-  status?: 'active' | 'inactive' | 'all'
+  // 'all', or a comma list of 'active' | 'inactive' | 'ignored'.
+  status?: string
   city?: string[]
   region?: string[]
   market_type?: string[]
@@ -414,8 +417,8 @@ const livenessDotClass = (score: number) => {
 // server (FetchMarkets), and every page of the infinite scroll is fetched under
 // them. `props.filters` is what the server applied, so the page starts from it.
 // Inactive markets (including anything scored 1 or below, which the model
-// deactivates on save) are hidden unless asked for: no `status` means "Active",
-// and the Status chip is how to include Inactive or see everything.
+// deactivates on save) and ignored ones are hidden unless asked for: no
+// `status` means "Active", and the Status chip is how to include the others.
 
 // Guards the same trap as the controller's cast: an empty list has an array's
 // own `sort`, `filter` and so on.
@@ -442,7 +445,7 @@ const localFilters = ref<Record<string, any>>({
 
 // DataTable's own chips start from what the server applied.
 const initialChips = {
-  status: localFilters.value.status === 'all' ? [] : [localFilters.value.status],
+  status: localFilters.value.status === 'all' ? [] : localFilters.value.status.split(','),
   city: localFilters.value.city,
   region: localFilters.value.region,
   market_type: localFilters.value.market_type,
@@ -498,7 +501,7 @@ const {
   mapDataTableFilters: ({ search, filters }, f) => {
     f.search = search
     const status = (filters.status as string[] | undefined) ?? []
-    f.status = status.length === 1 ? status[0] : 'all'
+    f.status = status.length ? status.join(',') : 'all'
     f.city = (filters.city as string[] | undefined) ?? []
     f.region = (filters.region as string[] | undefined) ?? []
     f.market_type = (filters.market_type as string[] | undefined) ?? []
@@ -548,10 +551,17 @@ const visibleSchedules = (item: { schedules: ScheduleRow[]; matched_schedule_ids
     ? item.schedules.filter((s) => item.matched_schedule_ids.includes(s.id))
     : item.schedules.slice(0, 2)
 
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'ignored', label: 'Ignored' },
+]
+const statusLabel = (status: string) => STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status
+
 const columns = computed<Column[]>(() => [
   {
     key: 'status', label: 'Status', filterable: true, filterType: 'multiselect', filterOnly: true,
-    options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+    options: STATUS_OPTIONS,
   },
   { key: 'name', label: 'Market', sortable: true },
   // Only while searching near a place: the drive to each market, beside its name.

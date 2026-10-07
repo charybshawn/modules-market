@@ -114,6 +114,8 @@ you've opted in to replacing the set.
 | `liveness_score` | `0`-`4`, from the liveness scoring step below. This is the score for the *market as a whole* (does it still exist and run?); each schedule carries its own too. A brand-new market scoring 0-1 doesn't get an XML entry at all, but one already in the database does, so its old score gets overwritten (see SKILL.md step 7). **The import marks any market saved with a score of 0 or 1 inactive** (there's no `<is_active>` element to write — the score drives it), and inactive markets are hidden from the admin panel's default list. |
 | `schedules` | Container for one or more `<schedule>` blocks — see below. Optional; omit it entirely when research didn't turn up any schedule detail (an existing market's hand-entered schedules are left alone when a re-import has none). |
 | `liveness_checked_at` | `YYYY-MM-DD`. Optional — if omitted, the import defaults it to the import date itself, which is correct for a fresh research pass. Only set it explicitly when re-importing older research and you want the *original* check date preserved instead. |
+| `ignored_at` | `YYYY-MM-DD`. **Export-only, never write it yourself.** Present when an admin marked the market ignored ("not relevant to us"). The import ignores it, so carrying it forward is harmless, but adding, changing or removing it does nothing. Ignoring is set only on the market's page in the admin panel. |
+| `ignored_reason` | Export-only, same as `ignored_at`: the admin's note on why. |
 
 ## Schedules
 

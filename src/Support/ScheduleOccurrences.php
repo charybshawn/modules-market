@@ -23,7 +23,7 @@ class ScheduleOccurrences
         $rows = [];
 
         foreach ($schedules as $schedule) {
-            if (! $schedule->market?->is_active || ! $schedule->isPlaceable()) {
+            if (! $schedule->market?->is_active || $schedule->market->isIgnored() || ! $schedule->isPlaceable()) {
                 continue;
             }
 

@@ -29,7 +29,7 @@ use SimpleXMLElement;
 class ImportMarketsFromXml
 {
     /**
-     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>}
+     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int}
      */
     public function handle(UploadedFile $file): array
     {
@@ -51,6 +51,7 @@ class ImportMarketsFromXml
         $schedulesSkipped = 0;
         $deactivated = 0;
         $unknownTowns = [];
+        $ignoredUpdated = 0;
 
         foreach ($xml->market as $node) {
             $name = $this->text($node, 'name');
@@ -139,6 +140,12 @@ class ImportMarketsFromXml
                 event($event);
                 $created++;
             } elseif ($event->changes !== []) {
+                // Ignored markets still take updates (so un-ignoring one
+                // brings back current data) but stay ignored: ignored_at
+                // isn't fillable, so nothing above could have cleared it.
+                if ($market->isIgnored()) {
+                    $ignoredUpdated++;
+                }
                 // $event->changes is Eloquent's own post-save getChanges()
                 // (plus the schedules diff above) -- the same comparison
                 // that decides whether to fire the audit event doubles as
@@ -162,6 +169,7 @@ class ImportMarketsFromXml
             'schedules_skipped' => $schedulesSkipped,
             'deactivated' => $deactivated,
             'unknown_towns' => array_values($unknownTowns),
+            'ignored_updated' => $ignoredUpdated,
         ];
     }
 

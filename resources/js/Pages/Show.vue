@@ -8,6 +8,20 @@
       <AdminMobileHeader :title="market.name" :href="route('admin.market.index')" />
 
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
+        <div v-if="market.ignored_at" class="m-6 mb-0 rounded-md bg-gray-100 dark:bg-gray-700/60 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div class="min-w-0 flex-1 text-sm">
+            <p class="font-medium text-gray-900 dark:text-white">Ignored since {{ ignoredSince }}</p>
+            <p v-if="market.ignored_reason" class="mt-0.5 text-gray-700 dark:text-gray-300">{{ market.ignored_reason }}</p>
+            <p class="mt-0.5 text-gray-500 dark:text-gray-400">Hidden from the markets list and calendar. Imports still keep its details up to date.</p>
+          </div>
+          <button
+            type="button"
+            :disabled="unignoring"
+            class="tap-target-touch shrink-0 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+            @click="unignore"
+          >{{ unignoring ? 'Un-ignoring...' : 'Un-ignore' }}</button>
+        </div>
+
         <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
           <div class="min-w-0 flex-1 space-y-2">
             <!-- Name is only inline-editable on desktop: on mobile the name
@@ -87,6 +101,12 @@
               :href="route('admin.market.index')"
               class="tap-target-touch hidden md:inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             >&larr; Back</Link>
+            <button
+              v-if="!market.ignored_at"
+              type="button"
+              class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+              @click="showIgnore = true"
+            >Ignore</button>
             <Link
               :href="route('admin.market.edit', market.id)"
               class="tap-target-touch inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
@@ -250,6 +270,8 @@
       @close="editingSchedule = null"
       @saved="handleScheduleSaved"
     />
+
+    <IgnoreMarketModal :show="showIgnore" :market-id="market.id" :market-name="market.name" @close="showIgnore = false" />
   </div>
 </template>
 
@@ -263,6 +285,7 @@ import MarketEventFilters from './Partials/MarketEventFilters.vue'
 import MarketEventList from './Partials/MarketEventList.vue'
 import MarketEventsDrawer from './Partials/MarketEventsDrawer.vue'
 import ScheduleEditModal from './Partials/ScheduleEditModal.vue'
+import IgnoreMarketModal from './Partials/IgnoreMarketModal.vue'
 import { recurrenceSummary } from './Partials/scheduleSummary'
 import { useMarketEvents, type HistoryConfig } from './Partials/useMarketEvents'
 
@@ -309,6 +332,8 @@ interface MarketDetail {
   liveness_score: number | null
   liveness_checked_at: string | null
   is_active: boolean
+  ignored_at: string | null
+  ignored_reason: string | null
   schedules: ScheduleDetail[]
 }
 
@@ -417,6 +442,25 @@ const handleScheduleSaved = () => {
 }
 
 const togglingActive = ref(false)
+
+// Ignore opens a dialog (for the optional reason); un-ignoring loses
+// nothing, so it happens straight from the banner.
+const showIgnore = ref(false)
+const unignoring = ref(false)
+const unignore = () => {
+  router.patch(route('admin.market.ignore', market.value.id), { ignored: false }, {
+    preserveScroll: true,
+    onStart: () => (unignoring.value = true),
+    onFinish: () => (unignoring.value = false),
+  })
+}
+// ignored_at is a full timestamp (UTC), so format it in local time rather
+// than slicing its date part like the date-only fields.
+const ignoredSince = computed(() =>
+  market.value.ignored_at
+    ? new Date(market.value.ignored_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '',
+)
 
 const toggleActive = async () => {
   togglingActive.value = true

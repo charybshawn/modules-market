@@ -22,6 +22,13 @@ use SimpleXMLElement;
  * market that was deactivated by hand despite a higher score round-trips
  * back to active on the target server. Not fixed here since it would mean
  * changing ImportMarketsFromXml's contract too, not just this export.
+ *
+ * `<ignored_at>`/`<ignored_reason>` are the opposite: written out, but
+ * read-only. They're there so a baseline built from an export (see the
+ * find-bc-markets skill's getting-the-baseline.md) can tell which markets
+ * are ignored. The import never reads them -- ignoring is set only from
+ * the market page -- so a moved dataset arrives un-ignored and needs
+ * re-ignoring there, and a research XML can't ignore or un-ignore anything.
  */
 class ExportMarketsToXml
 {
@@ -68,6 +75,9 @@ class ExportMarketsToXml
         $this->addChild($node, 'sources', $market->sources);
         $this->addChild($node, 'liveness_score', $market->liveness_score);
         $this->addChild($node, 'liveness_checked_at', $market->liveness_checked_at?->toDateString());
+        // Read-only, see the class docblock: the import skips both.
+        $this->addChild($node, 'ignored_at', $market->ignored_at?->toDateString());
+        $this->addChild($node, 'ignored_reason', $market->ignored_reason);
 
         if ($market->schedules->isNotEmpty()) {
             $schedulesNode = $node->addChild('schedules');

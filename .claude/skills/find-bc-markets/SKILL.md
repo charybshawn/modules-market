@@ -58,7 +58,13 @@ matters:
    Keep the entries whose city or region matches the scope from step 1.
    Keep every field of each, not just the liveness-relevant ones — you need
    the full entry on hand, not just enough to score it, because of the
-   carry-forward rule below. Keep this baseline list in mind through the rest of the research —
+   carry-forward rule below. The baseline can include **ignored** markets
+   (see "Ignored markets" in `getting-the-baseline.md`) -- the user decided
+   they're not relevant. Never report one as a new find. Writing its entry to
+   update its details is fine: the import updates it and it stays ignored.
+   Don't suggest un-ignoring it, and leave it out of the summary's highlights
+   beyond a one-line "N ignored markets in this area were left as they are".
+   Keep this baseline list in mind through the rest of the research —
    step 6 compares fresh findings against it, and step 9 reports the diff.
    This step only reads; nothing about it writes to the database, so it's
    safe to run every time, including the very first run for a new scope

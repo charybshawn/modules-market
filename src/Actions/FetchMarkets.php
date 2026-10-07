@@ -34,6 +34,9 @@ class FetchMarkets
 {
     public const PER_PAGE = 25;
 
+    /** The Status chip's values. An ignored market is only ever 'ignored', never active or inactive. */
+    public const STATUSES = ['active', 'inactive', 'ignored'];
+
     public const SORTABLE = ['name', 'city', 'region', 'sponsor', 'liveness_score', 'drive_minutes'];
 
     private const SEARCHED = ['name', 'city', 'region', 'market_type', 'sponsor', 'phone'];
@@ -97,9 +100,12 @@ class FetchMarkets
 
         return [
             'search' => trim((string) ($filters['search'] ?? '')),
-            // Inactive markets stay hidden unless asked for, so a request
-            // that says nothing about status is the "Active" view.
-            'status' => $filters['status'] ?? 'active',
+            // Inactive and ignored markets stay hidden unless asked for, so a
+            // request that says nothing about status is the "Active" view.
+            // Otherwise 'all', or a comma list of STATUSES ("active,inactive").
+            'status' => ($filters['status'] ?? 'active') === 'all'
+                ? []
+                : array_values(array_intersect(self::STATUSES, explode(',', $filters['status'] ?? 'active'))),
             'city' => array_values($filters['city'] ?? []),
             'region' => array_values($filters['region'] ?? []),
             'market_type' => array_values($filters['market_type'] ?? []),
@@ -216,8 +222,16 @@ class FetchMarkets
     {
         $query = Market::query()->with('schedules');
 
-        if ($f['status'] !== 'all') {
-            $query->where('is_active', $f['status'] === 'active');
+        // Every status picked means everything, so skip the clause.
+        if ($f['status'] !== [] && count($f['status']) < count(self::STATUSES)) {
+            $query->where(function (Builder $status) use ($f) {
+                foreach ($f['status'] as $picked) {
+                    $status->orWhere(fn (Builder $q) => match ($picked) {
+                        'ignored' => $q->whereNotNull('ignored_at'),
+                        default => $q->whereNull('ignored_at')->where('is_active', $picked === 'active'),
+                    });
+                }
+            });
         }
 
         foreach (['city', 'region', 'market_type'] as $column) {

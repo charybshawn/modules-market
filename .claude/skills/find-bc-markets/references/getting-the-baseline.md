@@ -48,6 +48,14 @@ admin switched off by hand despite a higher score will look active in the
 export. That's a known gap in `ExportMarketsToXml`, noted in its docblock.
 Mention it if the user says a market "should be off" but it scores 2+.
 
+**Ignored markets.** A market an admin marked "not relevant to us" (only
+possible from its page in the admin panel) carries an `<ignored_at>` date,
+plus an `<ignored_reason>` when one was given. The local fallback below has
+the same as `ignored_at`/`ignored_reason` (set = ignored). Both are
+read-only: the import never reads them, so an ignored market that ends up in
+your XML is harmless (its details update and it stays ignored), and you
+can't ignore or un-ignore a market by editing them.
+
 ## 2. A local cultpantry checkout (fallback)
 
 Use this only if the user can't get an export, or explicitly asks for
@@ -78,5 +86,6 @@ entry back:
 | `weekdays`: integers, `0` = Sunday … `6` = Saturday | `<weekdays>sun,sat</weekdays>` |
 | `week_of_month`: `1`-`4`, or `-1` for last | `<week_of_month>1</week_of_month>`, or `last` |
 | `is_active`: present | not written. The score drives it on import |
+| `ignored_at`: a timestamp | `<ignored_at>` is a `YYYY-MM-DD` date. Read-only either way |
 
 Times are `HH:MM` in both.
