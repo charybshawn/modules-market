@@ -29,18 +29,11 @@
     </template>
 
     <div class="space-y-8">
-      <div v-if="market.ignored_at" class="rounded-md bg-gray-100 dark:bg-gray-700/60 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div class="min-w-0 flex-1 text-sm">
-          <p class="font-medium text-gray-900 dark:text-white">Ignored since {{ ignoredSince }}</p>
-          <p v-if="market.ignored_reason" class="mt-0.5 text-gray-700 dark:text-gray-300">{{ market.ignored_reason }}</p>
-          <p class="mt-0.5 text-gray-500 dark:text-gray-400">Hidden from the markets list and calendar. Imports still keep its details up to date.</p>
-        </div>
-        <button
-          type="button"
-          :disabled="unignoring"
-          class="tap-target-touch shrink-0 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-          @click="unignore"
-        >{{ unignoring ? 'Un-ignoring...' : 'Un-ignore' }}</button>
+      <!-- State only; the command to undo it is in the Danger zone. -->
+      <div v-if="market.ignored_at" class="rounded-md bg-gray-100 dark:bg-gray-700/60 p-4 text-sm">
+        <p class="font-medium text-gray-900 dark:text-white">Ignored since {{ ignoredSince }}</p>
+        <p v-if="market.ignored_reason" class="mt-0.5 text-gray-700 dark:text-gray-300">{{ market.ignored_reason }}</p>
+        <p class="mt-0.5 text-gray-500 dark:text-gray-400">Hidden from the markets list and calendar. Imports still keep its details up to date. Un-ignore it in the Danger zone.</p>
       </div>
 
       <div>
@@ -108,38 +101,6 @@
           </div>
         </dl>
       </div>
-
-      <!-- Active is an instant on/off setting, so a switch; Ignore needs a
-           reason and words, so a labelled button (FORM_DESIGN.md → Show
-           pages). An ignored market's Un-ignore is in the banner above. -->
-      <section>
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Status</h2>
-        <div class="mt-1 divide-y divide-gray-200 dark:divide-gray-700">
-          <div class="flex items-center justify-between gap-4 py-2">
-            <div>
-              <p class="text-sm font-medium text-gray-900 dark:text-white">Active</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">Still running. Inactive markets are left out of the list and calendar by default.</p>
-            </div>
-            <ToggleSwitch
-              :model-value="market.is_active"
-              label="Active"
-              :disabled="togglingActive"
-              @update:model-value="toggleActive"
-            />
-          </div>
-          <div v-if="!market.ignored_at" class="flex items-center justify-between gap-4 py-2">
-            <div>
-              <p class="text-sm font-medium text-gray-900 dark:text-white">Ignore</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">Not relevant to us. Hides it from the list and calendar; imports still keep it up to date.</p>
-            </div>
-            <button
-              type="button"
-              class="tap-target-touch shrink-0 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-              @click="showIgnore = true"
-            >Ignore</button>
-          </div>
-        </div>
-      </section>
 
       <section>
         <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Schedules</h2>
@@ -283,6 +244,49 @@
       </section>
     </div>
 
+    <!-- Danger zone (FORM_DESIGN.md): the market's consequential commands,
+         at the very bottom, each a labelled "…" button that only opens a
+         confirmation -- no switches. -->
+    <AccountSection id="danger-zone" title="Danger zone" tone="danger" class="mt-8">
+      <DangerRow
+        :title="market.is_active ? 'Mark inactive' : 'Mark active'"
+        :description="market.is_active
+          ? 'For a market that has stopped running. It\'s left out of the list and calendar by default; its details and history are kept.'
+          : 'Puts it back in the list and calendar.'"
+      >
+        <button
+          type="button"
+          :disabled="togglingActive"
+          :class="[dangerButtonClass, market.is_active ? dangerButtonRed : dangerButtonGray]"
+          @click="toggleActive"
+        >{{ market.is_active ? 'Mark inactive…' : 'Mark active…' }}</button>
+      </DangerRow>
+
+      <DangerRow
+        :title="market.ignored_at ? 'Un-ignore this market' : 'Ignore this market'"
+        :description="market.ignored_at
+          ? 'Shows it in the list and calendar again.'
+          : 'Not relevant to us. Hides it from the list and calendar; imports still keep its details up to date.'"
+      >
+        <button
+          v-if="market.ignored_at"
+          type="button"
+          :disabled="unignoring"
+          :class="[dangerButtonClass, dangerButtonGray]"
+          @click="unignore"
+        >Un-ignore…</button>
+        <button
+          v-else
+          type="button"
+          :class="[dangerButtonClass, dangerButtonRed]"
+          @click="showIgnore = true"
+        >Ignore…</button>
+      </DangerRow>
+    </AccountSection>
+
+    <!-- Room so the phone History drawer's bar never covers the danger zone. -->
+    <div v-if="feed.config.enabled" class="h-16 md:hidden" aria-hidden="true"></div>
+
     <MarketEventsDrawer v-if="feed.config.enabled" :feed="feed" />
 
     <ScheduleEditModal
@@ -306,7 +310,9 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
 import AdminShowShell from '@/Components/Admin/AdminShowShell.vue'
 import IconButton from '@/Components/IconButton.vue'
-import ToggleSwitch from '@/Components/ToggleSwitch.vue'
+import AccountSection from '@/Components/Admin/Accounts/AccountSection.vue'
+import DangerRow from '@/Components/Admin/Accounts/DangerRow.vue'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import InlineField from './Partials/InlineField.vue'
 import MarketEventFilters from './Partials/MarketEventFilters.vue'
 import MarketEventList from './Partials/MarketEventList.vue'
@@ -468,13 +474,29 @@ const handleScheduleSaved = () => {
   feed.reload()
 }
 
+const { confirmDialog } = useConfirmDialog()
+
+// Danger zone buttons, same as Accounts/Show: red for the command that
+// takes something away, grey for the one that undoes it.
+const dangerButtonClass = 'tap-target-touch inline-flex items-center justify-center px-4 py-2 rounded-md border text-sm font-medium disabled:opacity-50'
+const dangerButtonRed = 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20'
+const dangerButtonGray = 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+
 const togglingActive = ref(false)
 
-// Ignore (in the Status section) opens a dialog for the optional reason;
-// un-ignoring loses nothing, so it happens straight from the banner.
+// Ignore opens IgnoreMarketModal (for the optional reason), which is its
+// confirmation; Un-ignore gets a plain confirm, since nothing in the danger
+// zone is one click.
 const showIgnore = ref(false)
 const unignoring = ref(false)
-const unignore = () => {
+const unignore = async () => {
+  const confirmed = await confirmDialog({
+    title: 'Un-ignore market',
+    message: `Show "${market.value.name}" in the markets list and calendar again?`,
+    confirmLabel: 'Un-ignore',
+    variant: 'info',
+  })
+  if (!confirmed) return
   router.patch(route('admin.market.ignore', market.value.id), { ignored: false }, {
     preserveScroll: true,
     onStart: () => (unignoring.value = true),
@@ -490,6 +512,16 @@ const ignoredSince = computed(() =>
 )
 
 const toggleActive = async () => {
+  const deactivating = market.value.is_active
+  const confirmed = await confirmDialog({
+    title: deactivating ? 'Mark market inactive' : 'Mark market active',
+    message: deactivating
+      ? `Mark "${market.value.name}" as no longer running? It's left out of the list and calendar by default.`
+      : `Mark "${market.value.name}" as running again?`,
+    confirmLabel: deactivating ? 'Mark inactive' : 'Mark active',
+    variant: deactivating ? 'danger' : 'info',
+  })
+  if (!confirmed) return
   togglingActive.value = true
   try {
     // A real boolean, not '1'/'' -- Laravel's 'boolean' rule doesn't accept
@@ -498,7 +530,7 @@ const toggleActive = async () => {
     // every time with no visible error.
     await saveField('is_active', !market.value.is_active)
   } catch {
-    // The switch just stays as it was -- saveField's own errors aren't
+    // The button just stays as it was -- saveField's own errors aren't
     // surfaced anywhere for this control, so silently not-toggling is the
     // honest result rather than claiming a change that didn't happen.
   } finally {
