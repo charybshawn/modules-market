@@ -1,279 +1,286 @@
 <template>
-  <div class="md:pt-6 pb-24 md:pb-6">
-    <!-- Same outer wrapper as Edit.vue: no base px, the layout's own <main>
-         already provides none on mobile by design. -->
-    <!-- Wider than Create/Edit's max-w-3xl: those are forms, this is a
-         read-only detail page whose History section wants the room. -->
-    <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
+  <!-- Wide: the History section wants the room. -->
+  <AdminShowShell wide>
+    <template #mobile-header>
       <AdminMobileHeader :title="market.name" :href="route('admin.market.index')" />
+    </template>
 
-      <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
-        <div v-if="market.ignored_at" class="m-6 mb-0 rounded-md bg-gray-100 dark:bg-gray-700/60 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          <div class="min-w-0 flex-1 text-sm">
-            <p class="font-medium text-gray-900 dark:text-white">Ignored since {{ ignoredSince }}</p>
-            <p v-if="market.ignored_reason" class="mt-0.5 text-gray-700 dark:text-gray-300">{{ market.ignored_reason }}</p>
-            <p class="mt-0.5 text-gray-500 dark:text-gray-400">Hidden from the markets list and calendar. Imports still keep its details up to date.</p>
-          </div>
-          <button
-            type="button"
-            :disabled="unignoring"
-            class="tap-target-touch shrink-0 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-            @click="unignore"
-          >{{ unignoring ? 'Un-ignoring...' : 'Un-ignore' }}</button>
+    <!-- Edit is the only icon: Ignore needs words, so it's a labelled
+         control in the Status section (FORM_DESIGN.md → Show pages). -->
+    <template #actions>
+      <IconButton
+        :href="route('admin.market.edit', market.id)"
+        label="Edit market"
+        class="rounded-md text-gray-400 hover:text-gray-600 active:bg-gray-100 dark:text-gray-500 dark:hover:text-gray-300 dark:active:bg-gray-700"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      </IconButton>
+    </template>
+
+    <template #header>
+      <Link
+        :href="route('admin.market.index')"
+        class="hidden md:inline-flex tap-target-touch items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm"
+      >
+        &larr; Back to Markets
+      </Link>
+    </template>
+
+    <div class="space-y-8">
+      <div v-if="market.ignored_at" class="rounded-md bg-gray-100 dark:bg-gray-700/60 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="min-w-0 flex-1 text-sm">
+          <p class="font-medium text-gray-900 dark:text-white">Ignored since {{ ignoredSince }}</p>
+          <p v-if="market.ignored_reason" class="mt-0.5 text-gray-700 dark:text-gray-300">{{ market.ignored_reason }}</p>
+          <p class="mt-0.5 text-gray-500 dark:text-gray-400">Hidden from the markets list and calendar. Imports still keep its details up to date.</p>
         </div>
-
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-          <!-- Stacked on mobile (name, status, then full-width actions);
-               side by side from md, with the actions pinned top-right. -->
-          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div class="min-w-0 flex-1">
-              <!-- Shown on mobile too, although AdminMobileHeader repeats
-                   it: the header truncates to one line, this wraps. -->
-              <InlineField
-                label="Name"
-                :model-value="market.name"
-                value-class="text-xl md:text-2xl font-semibold leading-tight text-gray-900 dark:text-white"
-                :on-save="(v) => saveField('name', v)"
-              />
-
-              <!-- Liveness and its checked-on date share one wrapper so a
-                   wrap at phone width never leaves "checked" on a row of
-                   its own. -->
-              <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <button
-                  type="button"
-                  class="tap-target-touch inline-flex items-center disabled:opacity-50"
-                  :disabled="togglingActive"
-                  :title="market.is_active ? 'Mark inactive' : 'Mark active'"
-                  @click="toggleActive"
-                >
-                  <span
-                    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset"
-                    :class="market.is_active
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30'
-                      : 'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-700/60 dark:text-gray-300 dark:ring-gray-600'"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full" :class="market.is_active ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-500'"></span>
-                    {{ market.is_active ? 'Active' : 'Inactive' }}
-                  </span>
-                </button>
-                <span class="inline-flex flex-wrap items-center gap-x-1.5 text-gray-700 dark:text-gray-300">
-                  <span v-if="market.liveness_score !== null" class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(market.liveness_score)"></span>
-                  <InlineField
-                    label="Liveness Score"
-                    type="select"
-                    :model-value="market.liveness_score"
-                    :display-value="market.liveness_score !== null ? `${market.liveness_score}/4 · ${livenessLabel(market.liveness_score)}` : null"
-                    :options="livenessOptions"
-                    placeholder="Liveness not checked"
-                    :on-save="(v) => saveField('liveness_score', v)"
-                  />
-                  <span v-if="market.liveness_score !== null" class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500">
-                    · checked
-                    <InlineField
-                      label="Checked On"
-                      type="date"
-                      :model-value="market.liveness_checked_at?.slice(0, 10) ?? null"
-                      :display-value="formatDate(market.liveness_checked_at)"
-                      value-class="text-sm text-gray-400 dark:text-gray-500"
-                      :on-save="(v) => saveField('liveness_checked_at', v)"
-                    />
-                  </span>
-                </span>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 md:shrink-0">
-              <Link
-                :href="route('admin.market.index')"
-                class="tap-target-touch hidden md:inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              >&larr; Back</Link>
-              <button
-                v-if="!market.ignored_at"
-                type="button"
-                class="tap-target-touch flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-                @click="showIgnore = true"
-              >Ignore</button>
-              <Link
-                :href="route('admin.market.edit', market.id)"
-                class="tap-target-touch flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-              >Edit</Link>
-            </div>
-          </div>
-
-          <!-- The market's key facts as a labelled grid rather than a
-               dotted run of values: an empty one still reads as "—" under
-               its label instead of disappearing from the line. -->
-          <dl class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-            <div class="min-w-0">
-              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">City</dt>
-              <dd class="mt-1">
-                <InlineField label="City" :model-value="market.city" :datalist-options="props.cities" :on-save="(v) => saveField('city', v)" />
-                <span
-                  v-if="props.locationStatus !== 'ok'"
-                  class="mt-1 inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30"
-                  :title="props.locationStatus === 'no_city' ? 'No city is set, so this market can\'t be found by distance.' : 'This city isn\'t in the places list, so this market can\'t be found by distance.'"
-                >{{ props.locationStatus === 'no_city' ? 'No city' : 'Town not found' }}</span>
-              </dd>
-            </div>
-            <div class="min-w-0">
-              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Region</dt>
-              <dd class="mt-1"><InlineField label="Region" type="select" :model-value="market.region" :options="regionOptions" :on-save="(v) => saveField('region', v)" /></dd>
-            </div>
-            <div class="min-w-0">
-              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Type</dt>
-              <dd class="mt-1"><InlineField label="Market Type" :model-value="market.market_type" :datalist-options="props.marketTypes" :on-save="(v) => saveField('market_type', v)" /></dd>
-            </div>
-            <div class="min-w-0">
-              <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sponsor</dt>
-              <dd class="mt-1"><InlineField label="Sponsor" :model-value="market.sponsor" :on-save="(v) => saveField('sponsor', v)" /></dd>
-            </div>
-          </dl>
-        </div>
-
-        <div class="p-6 space-y-8">
-          <section>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Schedules</h2>
-            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Tap a schedule to edit it. Adding or removing one still happens on the Edit page.</p>
-            <p v-if="market.schedules.length === 0" class="mt-3 text-sm text-gray-500 dark:text-gray-400">No schedules yet.</p>
-            <ul v-else class="mt-3 divide-y divide-gray-200 dark:divide-gray-700 rounded-md border border-gray-200 dark:border-gray-700">
-              <li v-for="schedule in market.schedules" :key="schedule.id">
-                <button
-                  type="button"
-                  class="tap-target-touch flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                  @click="editingSchedule = schedule"
-                >
-                  <div class="min-w-0 space-y-0.5">
-                    <div class="text-sm font-medium text-gray-900 dark:text-white">
-                      {{ schedule.label ?? 'Schedule' }}
-                      <span v-if="schedule.frequency" class="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{{ frequencyLabel(schedule.frequency) }}</span>
-                    </div>
-                    <div v-if="dateRange(schedule) || recurrenceSummary(schedule)" class="flex flex-wrap items-center gap-2 py-1">
-                      <span
-                        v-if="dateRange(schedule)"
-                        class="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 px-2.5 py-1 text-sm font-semibold tabular-nums text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-200 dark:ring-indigo-400/30"
-                      >
-                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5M5.25 5.25h13.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-12a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>
-                        {{ dateRange(schedule) }}
-                      </span>
-                      <span
-                        v-if="recurrenceSummary(schedule)"
-                        class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-sm font-semibold tabular-nums text-gray-900 ring-1 ring-inset ring-gray-200 dark:bg-gray-700/60 dark:text-white dark:ring-gray-600"
-                      >
-                        <svg class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-400" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75V12l3.25 1.9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                        {{ recurrenceSummary(schedule) }}
-                      </span>
-                    </div>
-                    <div v-if="schedule.notes" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ schedule.notes }}</div>
-                    <div v-if="schedule.address_line1" class="text-sm text-gray-500 dark:text-gray-400">At {{ schedule.address_line1 }}</div>
-                  </div>
-                  <span
-                    class="shrink-0 inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300"
-                    :title="`${livenessLabel(schedule.liveness_score)} · checked ${formatDate(schedule.liveness_checked_at)}`"
-                  >
-                    <span class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(schedule.liveness_score)"></span>
-                    {{ schedule.liveness_score }}/4
-                  </span>
-                </button>
-              </li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Location</h2>
-            <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Street address</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Street address" :model-value="market.address_line1" placeholder="Add a street address" :on-save="(v) => saveField('address_line1', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Unit / suite</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Unit / suite" :model-value="market.address_line2" placeholder="Add a unit or suite" :on-save="(v) => saveField('address_line2', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Province</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Province" :model-value="market.province" placeholder="Add a province" :on-save="(v) => saveField('province', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Postal code</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Postal code" :model-value="market.postal_code" placeholder="Add a postal code" :on-save="(v) => saveField('postal_code', v)" /></dd>
-              </div>
-            </dl>
-          </section>
-
-          <section>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Contact</h2>
-            <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Phone</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Phone" type="tel" :model-value="market.phone" :href="market.phone ? `tel:${market.phone}` : null" placeholder="Add a phone number" :on-save="(v) => saveField('phone', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Manager</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Manager" :model-value="market.manager" placeholder="Add a manager" :on-save="(v) => saveField('manager', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Manager phone</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Manager phone" type="tel" :model-value="market.manager_phone" :href="market.manager_phone ? `tel:${market.manager_phone}` : null" placeholder="Add a manager phone" :on-save="(v) => saveField('manager_phone', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Email</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Email" type="email" :model-value="market.manager_email" :href="market.manager_email ? `mailto:${market.manager_email}` : null" placeholder="Add an email" :on-save="(v) => saveField('manager_email', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Facebook</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Facebook" type="url" :model-value="market.facebook_page" :href="isHttpUrl(market.facebook_page) ? market.facebook_page : null" external placeholder="Add a Facebook page" :on-save="(v) => saveField('facebook_page', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Instagram</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Instagram" type="url" :model-value="market.instagram_page" :href="isHttpUrl(market.instagram_page) ? market.instagram_page : null" external placeholder="Add an Instagram page" :on-save="(v) => saveField('instagram_page', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Website</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Website" type="url" :model-value="market.website" :href="isHttpUrl(market.website) ? market.website : null" external placeholder="Add a website" :on-save="(v) => saveField('website', v)" /></dd>
-              </div>
-            </dl>
-          </section>
-
-          <section>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">About</h2>
-            <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Description</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Description" type="textarea" multiline :model-value="market.description" placeholder="Add a description" :on-save="(v) => saveField('description', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Vendor fees</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Vendor fees" type="textarea" multiline :model-value="market.vendor_fees" placeholder="Add vendor fees" :on-save="(v) => saveField('vendor_fees', v)" /></dd>
-              </div>
-            </dl>
-          </section>
-
-          <section>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Notes &amp; Sources</h2>
-            <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Notes</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Notes" type="textarea" multiline :model-value="market.notes" placeholder="Add notes" :on-save="(v) => saveField('notes', v)" /></dd>
-              </div>
-              <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt class="text-sm text-gray-500 dark:text-gray-400">Sources</dt>
-                <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Sources" type="textarea" linkify-lines :model-value="market.sources" placeholder="Add sources" :on-save="(v) => saveField('sources', v)" /></dd>
-              </div>
-            </dl>
-          </section>
-
-          <section v-if="feed.config.enabled" class="hidden md:block">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">History</h2>
-            <div class="mt-3">
-              <MarketEventFilters :feed="feed" />
-            </div>
-            <div class="mt-3 max-h-[32rem] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 p-4">
-              <MarketEventList :feed="feed" />
-            </div>
-          </section>
-        </div>
+        <button
+          type="button"
+          :disabled="unignoring"
+          class="tap-target-touch shrink-0 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+          @click="unignore"
+        >{{ unignoring ? 'Un-ignoring...' : 'Un-ignore' }}</button>
       </div>
+
+      <div>
+        <!-- The name stays in the card on mobile too: AdminMobileHeader
+             truncates it to one line, this wraps. md:pr-40 keeps it clear
+             of the actions pill, which overlays this row on desktop. -->
+        <div class="md:mt-2 md:pr-40">
+          <InlineField
+            label="Name"
+            :model-value="market.name"
+            value-class="text-xl md:text-2xl font-semibold leading-tight text-gray-900 dark:text-white"
+            :on-save="(v) => saveField('name', v)"
+          />
+        </div>
+
+        <!-- One wrapper for the score and its checked-on date, so a wrap at
+             phone width never leaves "checked" on a row of its own. -->
+        <div class="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm text-gray-700 dark:text-gray-300">
+          <span v-if="market.liveness_score !== null" class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(market.liveness_score)"></span>
+          <InlineField
+            label="Liveness Score"
+            type="select"
+            :model-value="market.liveness_score"
+            :display-value="market.liveness_score !== null ? `${market.liveness_score}/4 · ${livenessLabel(market.liveness_score)}` : null"
+            :options="livenessOptions"
+            placeholder="Liveness not checked"
+            :on-save="(v) => saveField('liveness_score', v)"
+          />
+          <span v-if="market.liveness_score !== null" class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500">
+            · checked
+            <InlineField
+              label="Checked On"
+              type="date"
+              :model-value="market.liveness_checked_at?.slice(0, 10) ?? null"
+              :display-value="formatDate(market.liveness_checked_at)"
+              value-class="text-sm text-gray-400 dark:text-gray-500"
+              :on-save="(v) => saveField('liveness_checked_at', v)"
+            />
+          </span>
+        </div>
+
+        <dl class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          <div class="min-w-0">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">City</dt>
+            <dd class="mt-0.5">
+              <InlineField label="City" :model-value="market.city" :datalist-options="props.cities" :on-save="(v) => saveField('city', v)" />
+              <span
+                v-if="props.locationStatus !== 'ok'"
+                class="mt-1 inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30"
+                :title="props.locationStatus === 'no_city' ? 'No city is set, so this market can\'t be found by distance.' : 'This city isn\'t in the places list, so this market can\'t be found by distance.'"
+              >{{ props.locationStatus === 'no_city' ? 'No city' : 'Town not found' }}</span>
+            </dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Region</dt>
+            <dd class="mt-0.5"><InlineField label="Region" type="select" :model-value="market.region" :options="regionOptions" :on-save="(v) => saveField('region', v)" /></dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Type</dt>
+            <dd class="mt-0.5"><InlineField label="Market Type" :model-value="market.market_type" :datalist-options="props.marketTypes" :on-save="(v) => saveField('market_type', v)" /></dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Sponsor</dt>
+            <dd class="mt-0.5"><InlineField label="Sponsor" :model-value="market.sponsor" :on-save="(v) => saveField('sponsor', v)" /></dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Active is an instant on/off setting, so a switch; Ignore needs a
+           reason and words, so a labelled button (FORM_DESIGN.md → Show
+           pages). An ignored market's Un-ignore is in the banner above. -->
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Status</h2>
+        <div class="mt-1 divide-y divide-gray-200 dark:divide-gray-700">
+          <div class="flex items-center justify-between gap-4 py-2">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Active</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Still running. Inactive markets are left out of the list and calendar by default.</p>
+            </div>
+            <ToggleSwitch
+              :model-value="market.is_active"
+              label="Active"
+              :disabled="togglingActive"
+              @update:model-value="toggleActive"
+            />
+          </div>
+          <div v-if="!market.ignored_at" class="flex items-center justify-between gap-4 py-2">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Ignore</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Not relevant to us. Hides it from the list and calendar; imports still keep it up to date.</p>
+            </div>
+            <button
+              type="button"
+              class="tap-target-touch shrink-0 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+              @click="showIgnore = true"
+            >Ignore</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Schedules</h2>
+        <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Tap a schedule to edit it. Adding or removing one still happens on the Edit page.</p>
+        <p v-if="market.schedules.length === 0" class="mt-3 text-sm text-gray-500 dark:text-gray-400">No schedules yet.</p>
+        <ul v-else class="mt-3 divide-y divide-gray-200 dark:divide-gray-700 rounded-md border border-gray-200 dark:border-gray-700">
+          <li v-for="schedule in market.schedules" :key="schedule.id">
+            <button
+              type="button"
+              class="tap-target-touch flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
+              @click="editingSchedule = schedule"
+            >
+              <div class="min-w-0 space-y-0.5">
+                <div class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ schedule.label ?? 'Schedule' }}
+                  <span v-if="schedule.frequency" class="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{{ frequencyLabel(schedule.frequency) }}</span>
+                </div>
+                <div v-if="dateRange(schedule) || recurrenceSummary(schedule)" class="flex flex-wrap items-center gap-2 py-1">
+                  <span
+                    v-if="dateRange(schedule)"
+                    class="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 px-2.5 py-1 text-sm font-semibold tabular-nums text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-200 dark:ring-indigo-400/30"
+                  >
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5M5.25 5.25h13.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-12a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>
+                    {{ dateRange(schedule) }}
+                  </span>
+                  <span
+                    v-if="recurrenceSummary(schedule)"
+                    class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-sm font-semibold tabular-nums text-gray-900 ring-1 ring-inset ring-gray-200 dark:bg-gray-700/60 dark:text-white dark:ring-gray-600"
+                  >
+                    <svg class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-400" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75V12l3.25 1.9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    {{ recurrenceSummary(schedule) }}
+                  </span>
+                </div>
+                <div v-if="schedule.notes" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ schedule.notes }}</div>
+                <div v-if="schedule.address_line1" class="text-sm text-gray-500 dark:text-gray-400">At {{ schedule.address_line1 }}</div>
+              </div>
+              <span
+                class="shrink-0 inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300"
+                :title="`${livenessLabel(schedule.liveness_score)} · checked ${formatDate(schedule.liveness_checked_at)}`"
+              >
+                <span class="w-2 h-2 rounded-full flex-shrink-0" :class="livenessDotClass(schedule.liveness_score)"></span>
+                {{ schedule.liveness_score }}/4
+              </span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Location</h2>
+        <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Street address</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Street address" :model-value="market.address_line1" placeholder="Add a street address" :on-save="(v) => saveField('address_line1', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Unit / suite</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Unit / suite" :model-value="market.address_line2" placeholder="Add a unit or suite" :on-save="(v) => saveField('address_line2', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Province</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Province" :model-value="market.province" placeholder="Add a province" :on-save="(v) => saveField('province', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Postal code</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Postal code" :model-value="market.postal_code" placeholder="Add a postal code" :on-save="(v) => saveField('postal_code', v)" /></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Contact</h2>
+        <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Phone</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Phone" type="tel" :model-value="market.phone" :href="market.phone ? `tel:${market.phone}` : null" placeholder="Add a phone number" :on-save="(v) => saveField('phone', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Manager</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Manager" :model-value="market.manager" placeholder="Add a manager" :on-save="(v) => saveField('manager', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Manager phone</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Manager phone" type="tel" :model-value="market.manager_phone" :href="market.manager_phone ? `tel:${market.manager_phone}` : null" placeholder="Add a manager phone" :on-save="(v) => saveField('manager_phone', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Email</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Email" type="email" :model-value="market.manager_email" :href="market.manager_email ? `mailto:${market.manager_email}` : null" placeholder="Add an email" :on-save="(v) => saveField('manager_email', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Facebook</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Facebook" type="url" :model-value="market.facebook_page" :href="isHttpUrl(market.facebook_page) ? market.facebook_page : null" external placeholder="Add a Facebook page" :on-save="(v) => saveField('facebook_page', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Instagram</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Instagram" type="url" :model-value="market.instagram_page" :href="isHttpUrl(market.instagram_page) ? market.instagram_page : null" external placeholder="Add an Instagram page" :on-save="(v) => saveField('instagram_page', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Website</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Website" type="url" :model-value="market.website" :href="isHttpUrl(market.website) ? market.website : null" external placeholder="Add a website" :on-save="(v) => saveField('website', v)" /></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">About</h2>
+        <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Description</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Description" type="textarea" multiline :model-value="market.description" placeholder="Add a description" :on-save="(v) => saveField('description', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Vendor fees</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Vendor fees" type="textarea" multiline :model-value="market.vendor_fees" placeholder="Add vendor fees" :on-save="(v) => saveField('vendor_fees', v)" /></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Notes &amp; Sources</h2>
+        <dl class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Notes</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Notes" type="textarea" multiline :model-value="market.notes" placeholder="Add notes" :on-save="(v) => saveField('notes', v)" /></dd>
+          </div>
+          <div class="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt class="text-sm text-gray-500 dark:text-gray-400">Sources</dt>
+            <dd class="mt-0.5 sm:mt-0 sm:col-span-2"><InlineField label="Sources" type="textarea" linkify-lines :model-value="market.sources" placeholder="Add sources" :on-save="(v) => saveField('sources', v)" /></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section v-if="feed.config.enabled" class="hidden md:block">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">History</h2>
+        <div class="mt-3">
+          <MarketEventFilters :feed="feed" />
+        </div>
+        <div class="mt-3 max-h-[32rem] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 p-4">
+          <MarketEventList :feed="feed" />
+        </div>
+      </section>
     </div>
 
     <MarketEventsDrawer v-if="feed.config.enabled" :feed="feed" />
@@ -289,7 +296,7 @@
     />
 
     <IgnoreMarketModal :show="showIgnore" :market-id="market.id" :market-name="market.name" @close="showIgnore = false" />
-  </div>
+  </AdminShowShell>
 </template>
 
 <script setup lang="ts">
@@ -297,6 +304,9 @@ import { computed, ref } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
+import AdminShowShell from '@/Components/Admin/AdminShowShell.vue'
+import IconButton from '@/Components/IconButton.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 import InlineField from './Partials/InlineField.vue'
 import MarketEventFilters from './Partials/MarketEventFilters.vue'
 import MarketEventList from './Partials/MarketEventList.vue'
@@ -460,8 +470,8 @@ const handleScheduleSaved = () => {
 
 const togglingActive = ref(false)
 
-// Ignore opens a dialog (for the optional reason); un-ignoring loses
-// nothing, so it happens straight from the banner.
+// Ignore (in the Status section) opens a dialog for the optional reason;
+// un-ignoring loses nothing, so it happens straight from the banner.
 const showIgnore = ref(false)
 const unignoring = ref(false)
 const unignore = () => {
@@ -488,7 +498,7 @@ const toggleActive = async () => {
     // every time with no visible error.
     await saveField('is_active', !market.value.is_active)
   } catch {
-    // The badge just stays as it was -- saveField's own errors aren't
+    // The switch just stays as it was -- saveField's own errors aren't
     // surfaced anywhere for this control, so silently not-toggling is the
     // honest result rather than claiming a change that didn't happen.
   } finally {
