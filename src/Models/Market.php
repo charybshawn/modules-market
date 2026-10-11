@@ -283,6 +283,7 @@ class Market extends Model
     {
         return $this->schedules()->get()->map(fn (MarketSchedule $s) => [
             'label' => $s->label,
+            'market_type' => $s->market_type,
             'frequency' => $s->frequency,
             'weekdays' => $s->weekdays,
             'week_of_month' => $s->week_of_month,
@@ -322,6 +323,20 @@ class Market extends Model
     public function isIgnored(): bool
     {
         return $this->ignored_at !== null;
+    }
+
+    /**
+     * Markets of any of $types: their own type, or the type of a schedule that
+     * isn't over yet -- a farmers' market with an upcoming Christmas market
+     * counts as a Holiday market until that run ends.
+     *
+     * @param  array<int, string>  $types
+     */
+    public function scopeOfType(Builder $query, array $types): void
+    {
+        $query->where(fn (Builder $q) => $q
+            ->whereIn('market_type', $types)
+            ->orWhereHas('schedules', fn (Builder $s) => $s->whereIn('market_type', $types)->notOver()));
     }
 
     public function scopeNotIgnored(Builder $query): void

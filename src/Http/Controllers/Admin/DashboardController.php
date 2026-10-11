@@ -50,7 +50,18 @@ class DashboardController extends Controller implements HasMiddleware
         $onFile = Market::query()->notIgnored();
 
         [$regions, $unassigned] = $this->countBy($onFile, 'region', Market::REGIONS);
-        [$types, $untyped] = $this->countBy($onFile, 'market_type', Market::MARKET_TYPES);
+        [, $untyped] = $this->countBy($onFile, 'market_type', Market::MARKET_TYPES);
+
+        // By type, the way the list's type filter matches: a market's own type
+        // or an upcoming schedule's, so one market can count under two types.
+        $types = collect(Market::MARKET_TYPES)
+            ->map(fn (string $type) => [
+                'market_type' => $type,
+                'total' => (clone $onFile)->ofType([$type])->count(),
+                'active' => (clone $onFile)->ofType([$type])->where('is_active', true)->count(),
+            ])
+            ->sortBy([['total', 'desc'], ['market_type', 'asc']])
+            ->values();
 
         return Inertia::render('Vendor/market/Dashboard', [
             'counts' => [

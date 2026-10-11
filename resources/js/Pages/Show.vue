@@ -117,6 +117,7 @@
                 <div class="text-sm font-medium text-gray-900 dark:text-white">
                   {{ schedule.label ?? 'Schedule' }}
                   <span v-if="schedule.frequency" class="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">{{ frequencyLabel(schedule.frequency) }}</span>
+                  <span v-if="schedule.market_type" class="ml-1.5 inline-flex items-center rounded px-1.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">{{ schedule.market_type }}</span>
                 </div>
                 <div v-if="dateRange(schedule) || recurrenceSummary(schedule)" class="flex flex-wrap items-center gap-2 py-1">
                   <span
@@ -294,6 +295,7 @@
       :market-name="market.name"
       :schedule="editingSchedule"
       :frequencies="props.frequencies"
+      :market-types="props.marketTypes"
       :liveness-labels="props.livenessLabels"
       @close="editingSchedule = null"
       @saved="handleScheduleSaved"
@@ -327,6 +329,7 @@ defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: tr
 interface ScheduleDetail {
   id: number
   label: string | null
+  market_type: string | null
   frequency: string | null
   weekdays: number[] | null
   week_of_month: number | null

@@ -99,7 +99,7 @@
           </div>
 
           <div class="pt-6 border-t border-gray-200 dark:border-gray-700">
-            <ScheduleFields v-model="form.schedules" :frequencies="props.frequencies" :liveness-labels="props.livenessLabels" :errors="form.errors" />
+            <ScheduleFields v-model="form.schedules" :frequencies="props.frequencies" :market-types="props.marketTypes" :liveness-labels="props.livenessLabels" :errors="form.errors" />
           </div>
 
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">

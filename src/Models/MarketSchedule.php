@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $market_id
  * @property string|null $label
+ * @property string|null $market_type one of Market::MARKET_TYPES when this run is a different kind of market from its host; null = the market's own
  * @property string|null $frequency one of Market::FREQUENCIES' keys
  * @property array<int, int>|null $weekdays 0 = Sunday ... 6 = Saturday
  * @property int|null $week_of_month 1-4, or -1 for the last; monthly only
@@ -31,6 +32,7 @@ class MarketSchedule extends Model
     protected $fillable = [
         'market_id',
         'label',
+        'market_type',
         'frequency',
         'weekdays',
         'week_of_month',
@@ -184,6 +186,23 @@ class MarketSchedule extends Model
     {
         $query->where(fn (Builder $q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $to->endOfDay()->toDateTimeString()))
             ->where(fn (Builder $q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $from->startOfDay()->toDateTimeString()));
+    }
+
+    /**
+     * Schedules still to come or under way: a season that hasn't ended, or a
+     * one-day event that hasn't happened. An open end counts as ongoing.
+     */
+    public function scopeNotOver(Builder $query, ?CarbonInterface $today = null): void
+    {
+        $today = ($today ?? now())->toDateString();
+
+        $query->where(fn (Builder $q) => $q
+            ->where('end_date', '>=', $today)
+            ->orWhere(fn (Builder $open) => $open->whereNull('end_date')->where(fn (Builder $o) => $o
+                ->where('frequency', '!=', 'one_time')
+                ->orWhereNull('frequency')
+                ->orWhereNull('start_date')
+                ->orWhere('start_date', '>=', $today))));
     }
 
     /**

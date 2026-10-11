@@ -34,6 +34,7 @@
       <ScheduleFieldset
         v-model="schedules[index]"
         :frequencies="frequencies"
+        :market-types="marketTypes"
         :liveness-labels="livenessLabels"
         :errors="errors"
         :error-prefix="`schedules.${index}.`"
@@ -49,6 +50,7 @@ export type { ScheduleForm }
 
 defineProps<{
   frequencies: Record<string, string>
+  marketTypes: string[]
   livenessLabels: Record<number, string>
   errors: Record<string, string>
 }>()
@@ -60,6 +62,7 @@ const addSchedule = () => {
     ...schedules.value,
     {
       label: '',
+      market_type: null,
       frequency: null,
       weekdays: [],
       week_of_month: null,

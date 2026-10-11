@@ -559,6 +559,7 @@ class MarketController extends Controller implements HasMiddleware
     {
         return [
             'label' => ['nullable', 'string', 'max:255'],
+            'market_type' => ['nullable', Rule::in(Market::MARKET_TYPES)],
             'frequency' => ['nullable', Rule::in(array_keys(Market::FREQUENCIES))],
             'weekdays' => ['nullable', 'array'],
             'weekdays.*' => ['integer', 'between:0,6'],

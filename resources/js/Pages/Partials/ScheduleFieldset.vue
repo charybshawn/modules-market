@@ -13,6 +13,16 @@
     </div>
   </div>
 
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
+    <select v-model="schedule.market_type" :class="inputClass">
+      <option :value="null">Same as the market</option>
+      <option v-for="t in marketTypes" :key="t" :value="t">{{ t }}</option>
+    </select>
+    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Only when this run is a different kind of market, e.g. a farmers' market's Christmas market.</p>
+    <p v-if="errors[`${errorPrefix}market_type`]" class="mt-1 text-sm text-red-600 dark:text-red-400">{{ errors[`${errorPrefix}market_type`] }}</p>
+  </div>
+
   <div v-if="schedule.frequency !== 'one_time'">
     <span class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market days</span>
     <div class="mt-1 flex flex-wrap gap-2" role="group" aria-label="Market days">
@@ -101,6 +111,8 @@ import { WEEKDAY_NAMES } from './scheduleSummary'
 
 export interface ScheduleForm {
   label: string
+  // null = the market's own type.
+  market_type: string | null
   frequency: string | null
   // 0 = Sunday ... 6 = Saturday, same as MarketSchedule::WEEKDAYS.
   weekdays: number[]
@@ -119,6 +131,7 @@ export interface ScheduleForm {
 
 withDefaults(defineProps<{
   frequencies: Record<string, string>
+  marketTypes: string[]
   livenessLabels: Record<number, string>
   errors: Record<string, string>
   // ScheduleFields.vue's repeater keys its errors `schedules.${index}.field`

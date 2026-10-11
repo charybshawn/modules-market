@@ -128,7 +128,7 @@ class ImportMarketsFromXml
                 $deactivated++;
             }
 
-            $schedules = $this->schedules($node, $schedulesSkipped);
+            $schedules = $this->schedules($node, $schedulesSkipped, $unknownTypes);
             if ($schedules !== [] && ! $this->schedulesMatch($schedulesBefore, $schedules)) {
                 // Replace-all, but only when the entry actually carried
                 // valid schedules -- a market re-imported without any
@@ -258,7 +258,7 @@ class ImportMarketsFromXml
      *
      * @return array<int, array<string, mixed>>
      */
-    private function schedules(SimpleXMLElement $node, int &$skipped): array
+    private function schedules(SimpleXMLElement $node, int &$skipped, array &$unknownTypes): array
     {
         $schedules = [];
 
@@ -286,8 +286,15 @@ class ImportMarketsFromXml
                 $this->time($schedule, 'end_time'),
             );
 
+            $type = Market::canonicalMarketType($this->text($schedule, 'market_type'));
+            if ($type === false) {
+                $unknownTypes[$this->text($schedule, 'market_type')] = $this->text($schedule, 'market_type');
+                $type = null;
+            }
+
             $schedules[] = [
                 'label' => $this->text($schedule, 'label'),
+                'market_type' => $type,
                 'frequency' => $frequency,
                 'weekdays' => $legacy['weekdays'],
                 // Mirrors MarketSchedule's saving hook, so the unchanged

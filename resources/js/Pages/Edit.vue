@@ -93,7 +93,7 @@
           </div>
 
           <div class="pt-6 border-t border-gray-200 dark:border-gray-700">
-            <ScheduleFields v-model="form.schedules" :frequencies="props.frequencies" :liveness-labels="props.livenessLabels" :errors="form.errors" />
+            <ScheduleFields v-model="form.schedules" :frequencies="props.frequencies" :market-types="props.marketTypes" :liveness-labels="props.livenessLabels" :errors="form.errors" />
           </div>
 
           <div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -204,6 +204,7 @@ defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: tr
 
 interface MarketScheduleDetail {
   label: string | null
+  market_type: string | null
   frequency: string | null
   weekdays: number[] | null
   week_of_month: number | null
@@ -288,6 +289,7 @@ const form = useForm({
   // needs plain YYYY-MM-DD, same slice as liveness_checked_at above.
   schedules: props.market.schedules.map((s): ScheduleForm => ({
     label: s.label ?? '',
+    market_type: s.market_type ?? null,
     frequency: s.frequency,
     weekdays: [...(s.weekdays ?? [])],
     week_of_month: s.week_of_month,

@@ -91,6 +91,7 @@ class ExportMarketsToXml
         $node = $schedulesNode->addChild('schedule');
 
         $this->addChild($node, 'label', $schedule->label);
+        $this->addChild($node, 'market_type', $schedule->market_type);
         $this->addChild($node, 'frequency', $schedule->frequency);
         if (! empty($schedule->weekdays)) {
             $this->addChild($node, 'weekdays', collect($schedule->weekdays)->map(fn (int $d) => MarketSchedule::WEEKDAYS[$d])->implode(','));

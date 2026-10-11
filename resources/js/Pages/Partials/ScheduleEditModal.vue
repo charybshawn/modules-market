@@ -8,7 +8,7 @@
         <FormErrorSummary :errors="form.errors" class="mt-4" />
 
         <div class="mt-4 space-y-4">
-          <ScheduleFieldset v-model="form" :frequencies="frequencies" :liveness-labels="livenessLabels" :errors="form.errors" />
+          <ScheduleFieldset v-model="form" :frequencies="frequencies" :market-types="marketTypes" :liveness-labels="livenessLabels" :errors="form.errors" />
         </div>
 
         <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -33,7 +33,7 @@
 
           <FormErrorSummary :errors="form.errors" />
 
-          <ScheduleFieldset v-model="form" :frequencies="frequencies" :liveness-labels="livenessLabels" :errors="form.errors" />
+          <ScheduleFieldset v-model="form" :frequencies="frequencies" :market-types="marketTypes" :liveness-labels="livenessLabels" :errors="form.errors" />
         </div>
 
         <div class="shrink-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-3 border-t border-gray-200 dark:border-gray-700">
@@ -66,6 +66,7 @@ import ScheduleFieldset, { type ScheduleForm } from './ScheduleFieldset.vue'
 export interface ScheduleDetail {
   id: number
   label: string | null
+  market_type: string | null
   frequency: string | null
   weekdays: number[] | null
   week_of_month: number | null
@@ -84,6 +85,7 @@ interface Props {
   marketName: string
   schedule: ScheduleDetail | null
   frequencies: Record<string, string>
+  marketTypes: string[]
   livenessLabels: Record<number, string>
 }
 
@@ -93,6 +95,7 @@ const emit = defineEmits<{ close: []; saved: [] }>()
 
 const form = useForm<ScheduleForm>({
   label: '',
+  market_type: null,
   frequency: null,
   weekdays: [],
   week_of_month: null,
@@ -118,6 +121,7 @@ watch(
     form.clearErrors()
     form.defaults({
       label: schedule.label ?? '',
+      market_type: schedule.market_type ?? null,
       frequency: schedule.frequency,
       weekdays: [...(schedule.weekdays ?? [])],
       week_of_month: schedule.week_of_month,

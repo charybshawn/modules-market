@@ -85,7 +85,7 @@
       <section class="bg-white dark:bg-gray-800 md:rounded-lg md:shadow-sm md:border md:border-gray-200 md:dark:border-gray-700">
         <div class="px-4 md:px-5 pt-5 pb-2">
           <h2 class="text-base font-semibold text-gray-900 dark:text-white">Markets by type</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400">Active and inactive, busiest first.</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Active and inactive, busiest first. A market with an upcoming run of another type, like a farmers' market's Christmas market, counts under both.</p>
         </div>
         <ul class="divide-y divide-gray-100 dark:divide-gray-700">
           <li v-for="row in props.types" :key="row.market_type">

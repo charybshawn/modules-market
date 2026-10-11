@@ -234,10 +234,14 @@ class FetchMarkets
             });
         }
 
-        foreach (['city', 'region', 'market_type'] as $column) {
+        foreach (['city', 'region'] as $column) {
             if ($f[$column] !== []) {
                 $query->whereIn($column, $f[$column]);
             }
+        }
+
+        if ($f['market_type'] !== []) {
+            $query->ofType($f['market_type']);
         }
 
         if ($f['search'] !== '') {

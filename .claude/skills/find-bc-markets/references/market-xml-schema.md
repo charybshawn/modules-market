@@ -69,6 +69,14 @@ Seed & plant sale
 - **Vintage & flea market**: vintage, flea and collector shows.
 - **Seed & plant sale**: seed swaps and plant sales.
 
+**A run of a different kind gets its own type.** When a market's schedule is
+a different kind of market from the market itself (most often a farmers'
+market's Christmas or holiday market), set that `<schedule>`'s own
+`<market_type>`. The list's type filter and the dashboard then find the market
+under both types until that run is over. Don't give a market's ordinary
+winter season a type of its own; an indoor winter farmers' market is still a
+farmers' market.
+
 Older free-text types ("Farmers", "Christmas market", "Garlic festival", and the
 rest of `Market::RETIRED_MARKET_TYPES`) still import and land on their new
 type. Anything else imports with no type and is named in the import summary.
@@ -156,6 +164,7 @@ markets will have just one.
 | Element | Notes |
 |---|---|
 | `label` | Optional. "Summer Market", "Winter Market", "Christmas Craft Fair". |
+| `market_type` | Optional, from the same controlled list as the market's. Only when this run is a different kind of market from its host: a farmers' market's Christmas market is `Holiday market`. Leave it out otherwise; it then counts as the market's own type. |
 | `frequency` | One of the controlled list above. |
 | `weekdays` | Comma-separated day keys: `sun,mon,tue,wed,thu,fri,sat`. The day(s) the market runs. **This is what puts a market on the admin calendar** — see "Deep-parsing schedules" below. Omit for `one_time`. |
 | `week_of_month` | `1`-`4`, or `last`. Only for `frequency` = `monthly` ("2nd Saturday" → `2`, "last Sunday" → `last`). Ignored for any other frequency. |
