@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Cultpantry\Market\Actions\BuildUpdateDigest;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Models\MarketSchedule;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -16,7 +17,7 @@ use Inertia\Response;
 
 /**
  * Landing page for the module (the sidebar link opens it): how many markets
- * are on file, how they spread across regions, and a day-by-day feed of what
+ * are on file, how they spread across regions and market types, and a day-by-day feed of what
  * was recently added. Ignored markets are left out of the counts, the same
  * way the list hides them unless asked.
  */
@@ -48,24 +49,8 @@ class DashboardController extends Controller implements HasMiddleware
 
         $onFile = Market::query()->notIgnored();
 
-        // Every region in the controlled list, busiest first, then any
-        // markets with no region (or a value outside the list) at the end.
-        $byRegion = (clone $onFile)
-            ->selectRaw('region, count(*) as total, sum(case when is_active then 1 else 0 end) as active')
-            ->groupBy('region')
-            ->get()
-            ->keyBy(fn ($row) => $row->region ?? '');
-
-        $regions = collect(Market::REGIONS)
-            ->map(fn (string $region) => [
-                'region' => $region,
-                'total' => (int) ($byRegion[$region]->total ?? 0),
-                'active' => (int) ($byRegion[$region]->active ?? 0),
-            ])
-            ->sortBy([['total', 'desc'], ['region', 'asc']])
-            ->values();
-
-        $unassigned = $byRegion->reject(fn ($row, $key) => in_array($key, Market::REGIONS, true));
+        [$regions, $unassigned] = $this->countBy($onFile, 'region', Market::REGIONS);
+        [$types, $untyped] = $this->countBy($onFile, 'market_type', Market::MARKET_TYPES);
 
         return Inertia::render('Vendor/market/Dashboard', [
             'counts' => [
@@ -74,14 +59,43 @@ class DashboardController extends Controller implements HasMiddleware
                 'ignored' => Market::whereNotNull('ignored_at')->count(),
             ],
             'regions' => $regions,
-            'unassigned' => [
-                'total' => (int) $unassigned->sum('total'),
-                'active' => (int) $unassigned->sum('active'),
-            ],
+            'unassigned' => $unassigned,
+            'types' => $types,
+            'untyped' => $untyped,
             'updates' => $this->updates($digest),
             // This IS the module root, so a single, non-linked crumb.
             'breadcrumbs' => [['label' => "Farmer's Markets"]],
         ]);
+    }
+
+    /**
+     * Every value in $list with its market count, busiest first, keyed by
+     * $column ('region' => 'Shuswap'), plus the markets with no value or one
+     * outside the list.
+     *
+     * @param  array<int, string>  $list
+     * @return array{0: Collection<int, array<string, mixed>>, 1: array{total: int, active: int}}
+     */
+    private function countBy(Builder $markets, string $column, array $list): array
+    {
+        $counts = (clone $markets)
+            ->selectRaw("{$column}, count(*) as total, sum(case when is_active then 1 else 0 end) as active")
+            ->groupBy($column)
+            ->get()
+            ->keyBy(fn ($row) => $row->{$column} ?? '');
+
+        $rows = collect($list)
+            ->map(fn (string $value) => [
+                $column => $value,
+                'total' => (int) ($counts[$value]->total ?? 0),
+                'active' => (int) ($counts[$value]->active ?? 0),
+            ])
+            ->sortBy([['total', 'desc'], [$column, 'asc']])
+            ->values();
+
+        $other = $counts->reject(fn ($row, $key) => in_array($key, $list, true));
+
+        return [$rows, ['total' => (int) $other->sum('total'), 'active' => (int) $other->sum('active')]];
     }
 
     /**

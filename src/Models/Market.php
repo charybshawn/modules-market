@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property string|null $city
  * @property string|null $region one of Market::REGIONS
- * @property string|null $market_type
+ * @property string|null $market_type one of Market::MARKET_TYPES
  * @property string|null $sponsor business or organization behind the market, when different from its name
  * @property string|null $address_line1
  * @property string|null $address_line2
@@ -94,6 +94,108 @@ class Market extends Model
         'North Coast' => 'Northern BC',
         'Northern Rockies' => 'Northern BC',
     ];
+
+    /**
+     * What kind of market it is. A short controlled list, so the filter and
+     * the dashboard group like with like; the nuance ("indoor winter",
+     * "charity") belongs in the description.
+     */
+    public const MARKET_TYPES = [
+        "Farmers' market",
+        'Artisan market',
+        'Craft fair',
+        'Holiday market',
+        'Night market',
+        'Festival market',
+        'Vintage & flea market',
+        'Seed & plant sale',
+    ];
+
+    /**
+     * Free-text types used before MARKET_TYPES existed, and the type each now
+     * counts as, so an old XML file or a stored record still lands in the
+     * right place. Matched case-insensitively.
+     */
+    public const RETIRED_MARKET_TYPES = [
+        'Farmers' => "Farmers' market",
+        'Farmers market' => "Farmers' market",
+        'Farmers & Craft' => "Farmers' market",
+        'Farmers (indoor winter)' => "Farmers' market",
+        'Farmers / artisan market' => "Farmers' market",
+        'Farmers, Artisan' => "Farmers' market",
+        'Farm and craft' => "Farmers' market",
+        'Community' => "Farmers' market",
+        'Community market' => "Farmers' market",
+        'Artisan' => 'Artisan market',
+        'Artisan and vendor market' => 'Artisan market',
+        'Artisan market (venue-based)' => 'Artisan market',
+        'Craft / artisan market' => 'Artisan market',
+        'Art / alternative craft market' => 'Artisan market',
+        'Artisan / oddities' => 'Artisan market',
+        'Pop-up vendor market' => 'Artisan market',
+        'Boutique seasonal market' => 'Artisan market',
+        'Winery artisan market' => 'Artisan market',
+        'Artisan shop' => 'Artisan market',
+        'Specialty grocery / artisan market (permanent store)' => 'Artisan market',
+        'Seasonal market' => 'Artisan market',
+        'Harvest market' => 'Artisan market',
+        'Harvest / fundraiser market' => 'Artisan market',
+        'Craft & gift fair' => 'Craft fair',
+        'Charity craft fair' => 'Craft fair',
+        'Hospital fundraiser craft fair' => 'Craft fair',
+        'Craft festival' => 'Craft fair',
+        'Art & artisan bazaar' => 'Craft fair',
+        'Artisan / home show marketplace' => 'Craft fair',
+        'Christmas market' => 'Holiday market',
+        'Holiday craft fair' => 'Holiday market',
+        'Christmas market / craft fair' => 'Holiday market',
+        'Christmas market / fundraiser' => 'Holiday market',
+        'Christmas market / night market' => 'Holiday market',
+        'Holiday market / artisan market' => 'Holiday market',
+        'Artisan night market' => 'Night market',
+        'Evening vendor market' => 'Night market',
+        'Garlic festival' => 'Festival market',
+        'Festival' => 'Festival market',
+        'Festival market (beverage festival)' => 'Festival market',
+        'Street festival market' => 'Festival market',
+        'Community festival (pollinator/biodiversity)' => 'Festival market',
+        'Fair marketplace' => 'Festival market',
+        'Spring market / farm festival' => 'Festival market',
+        'Vintage market' => 'Vintage & flea market',
+        'Flea' => 'Vintage & flea market',
+        'Flea market' => 'Vintage & flea market',
+        'Collector show' => 'Vintage & flea market',
+        'Vintage & collectibles show' => 'Vintage & flea market',
+        'Farm artisan / vintage market' => 'Vintage & flea market',
+        'Seed swap' => 'Seed & plant sale',
+        'Seed and plant sale' => 'Seed & plant sale',
+    ];
+
+    /**
+     * The MARKET_TYPES entry a typed-in value means: itself, or what a
+     * retired value now counts as, ignoring case. Null for no value, false for
+     * one that matches nothing.
+     */
+    public static function canonicalMarketType(?string $value): string|null|false
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        foreach (self::MARKET_TYPES as $type) {
+            if (strcasecmp($type, $value) === 0) {
+                return $type;
+            }
+        }
+        foreach (self::RETIRED_MARKET_TYPES as $old => $type) {
+            if (strcasecmp($old, $value) === 0) {
+                return $type;
+            }
+        }
+
+        return false;
+    }
 
     /**
      * How confident a liveness check is that a market is still actually

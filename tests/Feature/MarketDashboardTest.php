@@ -27,6 +27,22 @@ it('counts markets on file and per region, leaving ignored markets out', functio
     );
 });
 
+it('counts markets per type, busiest first, leaving ignored markets out', function () {
+    Market::create(['name' => 'A', 'market_type' => 'Craft fair', 'liveness_score' => 4]);
+    Market::create(['name' => 'B', 'market_type' => 'Craft fair', 'liveness_score' => 1]); // deactivated
+    Market::create(['name' => 'C', 'market_type' => "Farmers' market", 'liveness_score' => 4]);
+    Market::create(['name' => 'D', 'liveness_score' => 4]); // no type
+    Market::create(['name' => 'E', 'market_type' => "Farmers' market", 'liveness_score' => 4])->forceFill(['ignored_at' => now()])->save();
+
+    $this->actingAs($this->admin)->get('/admin/market/dashboard')->assertOk()->assertInertia(fn (Assert $p) => $p
+        ->has('types', count(Market::MARKET_TYPES))
+        ->where('types.0', ['market_type' => 'Craft fair', 'total' => 2, 'active' => 1])
+        ->where('types.1', ['market_type' => "Farmers' market", 'total' => 1, 'active' => 1])
+        ->where('types.2.total', 0)
+        ->where('untyped', ['total' => 1, 'active' => 1])
+    );
+});
+
 it('shows what was added, a day at a time, newest first', function () {
     $this->travelTo(now()->subDays(3));
     $older = Market::create(['name' => 'Ross Street Market', 'city' => 'Salmon Arm', 'liveness_score' => 4]);

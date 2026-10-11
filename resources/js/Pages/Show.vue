@@ -93,7 +93,7 @@
           </div>
           <div class="min-w-0">
             <dt class="text-sm text-gray-500 dark:text-gray-400">Type</dt>
-            <dd class="mt-0.5"><InlineField label="Market Type" :model-value="market.market_type" :datalist-options="props.marketTypes" :on-save="(v) => saveField('market_type', v)" /></dd>
+            <dd class="mt-0.5"><InlineField label="Market Type" type="select" :model-value="market.market_type" :options="marketTypeOptions" :on-save="(v) => saveField('market_type', v)" /></dd>
           </div>
           <div class="min-w-0">
             <dt class="text-sm text-gray-500 dark:text-gray-400">Sponsor</dt>
@@ -397,6 +397,7 @@ const frequencyLabel = (value: string) => props.frequencies[value] ?? value
 const livenessLabel = (score: number) => props.livenessLabels[score] ?? 'Unknown'
 
 const regionOptions = props.regions.map((r) => ({ value: r, label: r }))
+const marketTypeOptions = props.marketTypes.map((t) => ({ value: t, label: t }))
 const livenessOptions = Object.entries(props.livenessLabels).map(([value, label]) => ({ value: Number(value), label: `${value}/4 · ${label}` }))
 
 // Same bands as Index.vue: 4 confidently active, 2-3 probably active, 0-1 likely defunct.

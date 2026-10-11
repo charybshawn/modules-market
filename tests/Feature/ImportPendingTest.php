@@ -17,7 +17,7 @@ function marketResearchDir(array $files): string
     return $dir;
 }
 
-function marketXml(string $name, string $type = 'Farmers'): string
+function marketXml(string $name, string $type = "Farmers' market"): string
 {
     return '<?xml version="1.0" encoding="UTF-8"?><markets>'
         ."<market><name>{$name}</name><city>Salmon Arm</city><market_type>{$type}</market_type><liveness_score>4</liveness_score></market>"
@@ -27,14 +27,14 @@ function marketXml(string $name, string $type = 'Farmers'): string
 describe('market:import-pending', function () {
     it('imports pending files in name order, records them, and skips them next time', function () {
         $dir = marketResearchDir([
-            '2026-10-11-02-update.xml' => marketXml('Ross Street Market', 'Artisan'),
+            '2026-10-11-02-update.xml' => marketXml('Ross Street Market', 'Artisan market'),
             '2026-10-11-01-new.xml' => marketXml('Ross Street Market'),
         ]);
         file_put_contents($dir.'/archive/old.xml', marketXml('Archived Market'));
 
         $this->artisan('market:import-pending')->assertSuccessful();
 
-        expect(Market::where('name', 'Ross Street Market')->value('market_type'))->toBe('Artisan')
+        expect(Market::where('name', 'Ross Street Market')->value('market_type'))->toBe('Artisan market')
             ->and(Market::where('name', 'Archived Market')->exists())->toBeFalse()
             ->and(ImportRecord::orderBy('id')->pluck('filename')->all())->toBe(['2026-10-11-01-new.xml', '2026-10-11-02-update.xml']);
 
@@ -46,10 +46,10 @@ describe('market:import-pending', function () {
         $dir = marketResearchDir(['2026-10-11-01-new.xml' => marketXml('Ross Street Market')]);
         $this->artisan('market:import-pending')->assertSuccessful();
 
-        file_put_contents($dir.'/2026-10-11-01-new.xml', marketXml('Ross Street Market', 'Artisan'));
+        file_put_contents($dir.'/2026-10-11-01-new.xml', marketXml('Ross Street Market', 'Artisan market'));
         $this->artisan('market:import-pending')->assertSuccessful();
 
-        expect(Market::where('name', 'Ross Street Market')->value('market_type'))->toBe('Artisan')
+        expect(Market::where('name', 'Ross Street Market')->value('market_type'))->toBe('Artisan market')
             ->and(ImportRecord::count())->toBe(2);
     });
 
@@ -71,7 +71,7 @@ describe('market:import-pending', function () {
     it('dry-runs every pending file together, then rolls it all back', function () {
         marketResearchDir([
             '2026-10-11-01-new.xml' => marketXml('Ross Street Market'),
-            '2026-10-11-02-update.xml' => marketXml('Ross Street Market', 'Artisan'),
+            '2026-10-11-02-update.xml' => marketXml('Ross Street Market', 'Artisan market'),
         ]);
 
         $this->artisan('market:import-pending', ['--dry-run' => true])

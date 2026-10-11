@@ -42,6 +42,7 @@
     </dl>
 
     <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
+      <div class="space-y-6">
       <!-- Markets per region. Each row opens the list filtered to it. -->
       <section class="bg-white dark:bg-gray-800 md:rounded-lg md:shadow-sm md:border md:border-gray-200 md:dark:border-gray-700">
         <div class="px-4 md:px-5 pt-5 pb-2">
@@ -62,7 +63,7 @@
                   {{ row.region }}
                 </span>
                 <span class="mt-1.5 block h-1.5 rounded-full bg-gray-100 dark:bg-gray-700" aria-hidden="true">
-                  <span class="block h-1.5 rounded-full bg-indigo-500" :style="{ width: barWidth(row.total) }" />
+                  <span class="block h-1.5 rounded-full bg-indigo-500" :style="{ width: barWidth(row.total, regionMax) }" />
                 </span>
               </span>
               <span class="flex-shrink-0 text-right">
@@ -80,6 +81,46 @@
           </li>
         </ul>
       </section>
+
+      <!-- Markets per type. Each row opens the list filtered to it. -->
+      <section class="bg-white dark:bg-gray-800 md:rounded-lg md:shadow-sm md:border md:border-gray-200 md:dark:border-gray-700">
+        <div class="px-4 md:px-5 pt-5 pb-2">
+          <h2 class="text-base font-semibold text-gray-900 dark:text-white">Markets by type</h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Active and inactive, busiest first.</p>
+        </div>
+        <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+          <li v-for="row in props.types" :key="row.market_type">
+            <Link
+              :href="route('admin.market.index', { market_type: [row.market_type], status: 'active,inactive' })"
+              class="tap-target-touch flex items-center gap-4 px-4 md:px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            >
+              <span class="min-w-0 flex-1">
+                <span
+                  class="block text-sm font-medium"
+                  :class="row.total ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
+                >
+                  {{ row.market_type }}
+                </span>
+                <span class="mt-1.5 block h-1.5 rounded-full bg-gray-100 dark:bg-gray-700" aria-hidden="true">
+                  <span class="block h-1.5 rounded-full bg-indigo-500" :style="{ width: barWidth(row.total, typeMax) }" />
+                </span>
+              </span>
+              <span class="flex-shrink-0 text-right">
+                <span class="block text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{{ row.total }}</span>
+                <span v-if="row.total" class="block text-xs text-gray-500 dark:text-gray-400">{{ row.active }} active</span>
+              </span>
+            </Link>
+          </li>
+          <li v-if="props.untyped.total" class="flex items-center gap-4 px-4 md:px-5 py-3">
+            <span class="min-w-0 flex-1 text-sm italic text-gray-500 dark:text-gray-400">No type set</span>
+            <span class="flex-shrink-0 text-right">
+              <span class="block text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{{ props.untyped.total }}</span>
+              <span class="block text-xs text-gray-500 dark:text-gray-400">{{ props.untyped.active }} active</span>
+            </span>
+          </li>
+        </ul>
+      </section>
+      </div>
 
       <!-- What was added, a day at a time, newest first. -->
       <section class="bg-white dark:bg-gray-800 md:rounded-lg md:shadow-sm md:border md:border-gray-200 md:dark:border-gray-700">
@@ -138,6 +179,12 @@ import { adminNavIcons } from '@/utils/adminNavIcons'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
 
+interface TypeRow {
+  market_type: string
+  total: number
+  active: number
+}
+
 interface RegionRow {
   region: string
   total: number
@@ -159,6 +206,8 @@ const props = defineProps<{
   counts: { total: number; active: number; ignored: number }
   regions: RegionRow[]
   unassigned: { total: number; active: number }
+  types: TypeRow[]
+  untyped: { total: number; active: number }
   updates: Update[]
 }>()
 
@@ -179,8 +228,10 @@ const mobileLinks: QuickLinkItem[] = [
 
 const coveredRegions = computed(() => props.regions.filter((r) => r.total > 0).length)
 
-const busiest = computed(() => Math.max(1, ...props.regions.map((r) => r.total)))
-const barWidth = (total: number) => `${Math.round((total / busiest.value) * 100)}%`
+// Each list's bars are scaled to its own busiest row.
+const regionMax = computed(() => Math.max(1, ...props.regions.map((r) => r.total)))
+const typeMax = computed(() => Math.max(1, ...props.types.map((t) => t.total)))
+const barWidth = (total: number, max: number) => `${Math.round((total / max) * 100)}%`
 
 const latest = computed(() => props.updates[0] ?? null)
 

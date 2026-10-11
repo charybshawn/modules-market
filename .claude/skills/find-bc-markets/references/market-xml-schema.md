@@ -44,6 +44,35 @@ far more often than the broad region they technically sit inside. "Shuswap"
 and "Thompson Okanagan" are both valid, distinct values — don't collapse one
 into the other.
 
+## Controlled `market_type` values
+
+Case-insensitive on import, like regions. Pick the one that fits best and put
+the nuance ("indoor winter", "charity", "garlic festival") in `<description>`.
+
+```
+Farmers' market
+Artisan market
+Craft fair
+Holiday market
+Night market
+Festival market
+Vintage & flea market
+Seed & plant sale
+```
+
+- **Farmers' market**: produce-led, usually recurring, even with crafts alongside.
+- **Artisan market**: maker-led markets, pop-ups and harvest markets.
+- **Craft fair**: indoor craft and gift fairs, often annual or a fundraiser.
+- **Holiday market**: Christmas and other holiday markets.
+- **Night market**: evening markets.
+- **Festival market**: the market inside a festival or fair (garlic, beverage, street festivals).
+- **Vintage & flea market**: vintage, flea and collector shows.
+- **Seed & plant sale**: seed swaps and plant sales.
+
+Older free-text types ("Farmers", "Christmas market", "Garlic festival", and the
+rest of `Market::RETIRED_MARKET_TYPES`) still import and land on their new
+type. Anything else imports with no type and is named in the import summary.
+
 ## Controlled `frequency` values
 
 Used on each `<schedule>` (not on `<market>` itself).
@@ -94,7 +123,7 @@ you've opted in to replacing the set.
 | `name` | Required. |
 | `city` | The BC town the market is in, spelled as the town is normally written ("Salmon Arm", "West Kelowna"). It is free text, but it is also what a drive-time search locates the market by: a city missing here shows a "No city" badge, and one that isn't in `resources/data/bc-places.json` shows "Town not found" and can't be found by drive time. The import reports any such towns. |
 | `region` | One of the controlled list above. |
-| `market_type` | Free text — "Farmers", "Artisan", "Makers", etc. |
+| `market_type` | One of the controlled list above. |
 | `sponsor` | The business or organization behind the market, when that isn't already in its name — e.g. a night market at a resort, run by the resort's restaurant (`Finz Restaurant`). Leave it out when the market is simply run by its own organization. |
 | `address_line1` | Street address. |
 | `address_line2` | Unit/suite, if any. |
@@ -215,7 +244,7 @@ before handing a file off — it should report `text/xml`, not `text/plain`.
     <name>Salmon Arm Farmers Market</name>
     <city>Salmon Arm</city>
     <region>Shuswap</region>
-    <market_type>Farmers</market_type>
+    <market_type>Farmers' market</market_type>
     <address_line1>100 Ross St</address_line1>
     <province>BC</province>
     <postal_code>V1E 4N2</postal_code>
@@ -240,7 +269,7 @@ before handing a file off — it should report `text/xml`, not `text/plain`.
     <name>Vernon Farmers Market</name>
     <city>Vernon</city>
     <region>Okanagan</region>
-    <market_type>Farmers</market_type>
+    <market_type>Farmers' market</market_type>
     <website>https://vernonfarmersmarket.ca</website>
     <sources>https://vernonfarmersmarket.ca</sources>
   </market>

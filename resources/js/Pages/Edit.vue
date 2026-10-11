@@ -49,10 +49,10 @@
 
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Market Type</label>
-              <input v-model="form.market_type" type="text" list="market-type-options" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm" />
-              <datalist id="market-type-options">
-                <option v-for="t in props.marketTypes" :key="t" :value="t" />
-              </datalist>
+              <select v-model="form.market_type" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm">
+                <option value="">—</option>
+                <option v-for="t in props.marketTypes" :key="t" :value="t">{{ t }}</option>
+              </select>
             </div>
 
             <div>

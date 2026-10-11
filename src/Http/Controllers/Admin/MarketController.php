@@ -82,7 +82,7 @@ class MarketController extends Controller implements HasMiddleware
             ],
             'cities' => fn () => $this->knownValues('city'),
             'regions' => Market::REGIONS,
-            'marketTypes' => fn () => $this->knownValues('market_type'),
+            'marketTypes' => fn () => Market::MARKET_TYPES,
             'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
@@ -166,7 +166,7 @@ class MarketController extends Controller implements HasMiddleware
         return Inertia::render('Vendor/market/Create', [
             'cities' => $this->knownValues('city'),
             'regions' => Market::REGIONS,
-            'marketTypes' => $this->knownValues('market_type'),
+            'marketTypes' => Market::MARKET_TYPES,
             'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
@@ -201,7 +201,7 @@ class MarketController extends Controller implements HasMiddleware
             'locationStatus' => $market->locationStatus(),
             'cities' => $this->knownValues('city'),
             'regions' => Market::REGIONS,
-            'marketTypes' => $this->knownValues('market_type'),
+            'marketTypes' => Market::MARKET_TYPES,
             'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
             // No History section unless the host has said where a market's
@@ -254,7 +254,7 @@ class MarketController extends Controller implements HasMiddleware
             'market' => $market->load('schedules'),
             'cities' => $this->knownValues('city'),
             'regions' => Market::REGIONS,
-            'marketTypes' => $this->knownValues('market_type'),
+            'marketTypes' => Market::MARKET_TYPES,
             'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
@@ -510,7 +510,7 @@ class MarketController extends Controller implements HasMiddleware
             'name' => ['required', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'region' => ['nullable', Rule::in(Market::REGIONS)],
-            'market_type' => ['nullable', 'string', 'max:255'],
+            'market_type' => ['nullable', Rule::in(Market::MARKET_TYPES)],
             'sponsor' => ['nullable', 'string', 'max:255'],
             'address_line1' => ['nullable', 'string', 'max:255'],
             'address_line2' => ['nullable', 'string', 'max:255'],

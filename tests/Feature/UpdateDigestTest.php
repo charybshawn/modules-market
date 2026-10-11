@@ -16,7 +16,7 @@ function digestImport(string $markets): void
 
 function digestMarket(string $name, string $schedules = '', string $extra = ''): string
 {
-    return "<market><name>{$name}</name><city>Vernon</city><market_type>Artisan</market_type><liveness_score>4</liveness_score>{$extra}"
+    return "<market><name>{$name}</name><city>Vernon</city><market_type>Artisan market</market_type><liveness_score>4</liveness_score>{$extra}"
         .($schedules !== '' ? "<schedules>{$schedules}</schedules>" : '').'</market>';
 }
 

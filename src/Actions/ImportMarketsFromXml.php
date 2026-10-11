@@ -28,7 +28,7 @@ use SimpleXMLElement;
 class ImportMarketsFromXml
 {
     /**
-     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int}
+     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int, type_unmatched: array<int, string>}
      */
     public function handleString(string $contents): array
     {
@@ -55,6 +55,7 @@ class ImportMarketsFromXml
         $deactivated = 0;
         $unknownTowns = [];
         $ignoredUpdated = 0;
+        $unknownTypes = [];
 
         foreach ($xml->market as $node) {
             $name = $this->text($node, 'name');
@@ -79,12 +80,18 @@ class ImportMarketsFromXml
                 $region = null;
             }
 
+            $marketType = Market::canonicalMarketType($this->text($node, 'market_type'));
+            if ($marketType === false) {
+                $unknownTypes[$this->text($node, 'market_type')] = $this->text($node, 'market_type');
+                $marketType = null;
+            }
+
             $livenessScore = $this->livenessScore($node);
 
             $market->fill([
                 ...$matchOn,
                 'region' => $region,
-                'market_type' => $this->text($node, 'market_type'),
+                'market_type' => $marketType,
                 'sponsor' => $this->text($node, 'sponsor'),
                 'address_line1' => $this->text($node, 'address_line1'),
                 'address_line2' => $this->text($node, 'address_line2'),
@@ -167,6 +174,7 @@ class ImportMarketsFromXml
             'unchanged' => $unchanged,
             'skipped' => $skipped,
             'region_unmatched' => $regionUnmatched,
+            'type_unmatched' => array_values($unknownTypes),
             'schedules' => $scheduleCount,
             'schedules_skipped' => $schedulesSkipped,
             'deactivated' => $deactivated,
@@ -176,7 +184,7 @@ class ImportMarketsFromXml
     }
 
     /**
-     * @param  array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int}  $result
+     * @param  array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int, type_unmatched: array<int, string>}  $result
      */
     public function summarize(array $result): string
     {
@@ -203,6 +211,9 @@ class ImportMarketsFromXml
         }
         if ($result['unknown_towns'] !== []) {
             $message .= ' Not in the places list: '.implode(', ', $result['unknown_towns'])." -- those markets are flagged and won't show up in a distance search until the town is added to the module's bc-places.json.";
+        }
+        if ($result['type_unmatched'] !== []) {
+            $message .= ' Not a market type on the list: '.implode(', ', $result['type_unmatched'])." -- those markets imported without a type, set it by hand on the market's page.";
         }
         if ($result['region_unmatched'] > 0) {
             $message .= ' '.$plural($result['region_unmatched'], 'row')." had a region that didn't match the controlled list -- imported without one, set it by hand on that market's Edit page.";
