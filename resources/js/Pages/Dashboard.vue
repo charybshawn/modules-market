@@ -41,8 +41,7 @@
       </div>
     </dl>
 
-    <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
-      <div class="space-y-6">
+    <div class="grid gap-6 lg:grid-cols-3 lg:items-start">
       <!-- Markets per region. Each row opens the list filtered to it. -->
       <section class="bg-white dark:bg-gray-800 md:rounded-lg md:shadow-sm md:border md:border-gray-200 md:dark:border-gray-700">
         <div class="px-4 md:px-5 pt-5 pb-2">
@@ -120,7 +119,6 @@
           </li>
         </ul>
       </section>
-      </div>
 
       <!-- What was added, a day at a time, newest first. -->
       <section class="bg-white dark:bg-gray-800 md:rounded-lg md:shadow-sm md:border md:border-gray-200 md:dark:border-gray-700">
