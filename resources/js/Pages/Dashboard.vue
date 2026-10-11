@@ -122,24 +122,19 @@
       </section>
     </div>
 
-    <!-- Mobile: the desktop header's links. -->
-    <div class="md:hidden grid grid-cols-2 gap-3 px-4 pt-6">
-      <Link :href="route('admin.market.calendar')" :class="[SECONDARY_BUTTON, 'justify-center']">Calendar</Link>
-      <Link
-        :href="route('admin.market.index')"
-        class="tap-target-touch inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-      >
-        Browse markets
-      </Link>
-    </div>
+    <!-- Mobile: the desktop header's links, in the shared bottom bar. The
+         page's pb-36 keeps the last section clear of it. -->
+    <AdminQuickLinksBar :links="mobileLinks" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
+import AdminQuickLinksBar, { type QuickLinkItem } from '@/Components/Admin/AdminQuickLinksBar.vue'
+import { adminNavIcons } from '@/utils/adminNavIcons'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
 
@@ -168,6 +163,19 @@ const props = defineProps<{
 }>()
 
 const SECONDARY_BUTTON = 'tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+
+// The injected helper, not the global route(): this runs during server-side
+// rendering too, where only what ZiggyVue provides exists.
+const ziggyRoute = inject<typeof route>('route')!
+const mobileLinks: QuickLinkItem[] = [
+  { key: 'markets', label: 'Browse\nMarkets', href: ziggyRoute('admin.market.index'), icon: adminNavIcons.market },
+  {
+    key: 'calendar',
+    label: 'Calendar',
+    href: ziggyRoute('admin.market.calendar'),
+    icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  },
+]
 
 const coveredRegions = computed(() => props.regions.filter((r) => r.total > 0).length)
 
