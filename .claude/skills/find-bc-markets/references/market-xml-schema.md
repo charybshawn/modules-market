@@ -250,3 +250,35 @@ before handing a file off — it should report `text/xml`, not `text/plain`.
 Note the second entry: several fields are simply absent (no address, no
 phone, no schedules) because the research didn't turn them up — that's expected and fine,
 not an error to fix by guessing.
+
+## Saving and importing
+
+Shared by `find-bc-markets`, `refresh-bc-markets` and `scan-bc-market-socials`.
+Research files live in the private app repo, in `database/markets/` (in
+`/Users/shawn/Documents/code/cultpantry`), and travel with every push:
+
+1. **Name** the file `YYYY-MM-DD-NN-<what>.xml`, where `NN` is the next two-digit
+   sequence number for that day (`ls database/markets`) and `<what>` says what the
+   pass covered (`salmon-arm-1hr`, `refresh-batch1`, `social-scan-okanagan`). Files
+   are imported in name order, so a file that builds on another must sort after it.
+2. **Back up** the local database: copy `database/database.sqlite` into the scratchpad.
+3. **Dry run:** `php artisan market:import-pending --dry-run` imports every pending
+   file and rolls it all back. Fix every problem it reports: an unmatched region, an
+   unknown town, a skipped schedule.
+4. **Import:** `php artisan market:import-pending`, then report its summary in the
+   hand-off. Each file is all-or-nothing, the run stops at the first failure, and
+   the ledger (`market_imports`) records each file by content hash.
+5. **Commit** the file in the cultpantry repo. On deploy, the server runs the same
+   command (from the deploy script, and hourly), so committed files reach it on
+   their own once pushed.
+
+This is for the local database only. Never push, or import into staging or
+production, unless the user asks for that specifically.
+
+Never edit a file after it's imported unless you mean to re-import it: a changed
+file gets a new hash and is imported again. Every entry is a full overwrite, so
+re-importing an old file after newer research has landed rolls those markets
+back. Fix a mistake with a new, later file instead. Files under
+`database/markets/archive/` are history only and are never imported. The admin
+panel's Import XML button still works for one-off files that shouldn't ride
+along with the repo.

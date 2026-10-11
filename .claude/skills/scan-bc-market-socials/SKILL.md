@@ -17,8 +17,9 @@ one yet.
 `find-bc-markets`.** Route back to it and follow its "One-time, pop-up and
 past-event markets" section for the social-sourcing half of that request.
 
-Same ground rules as both other market skills: this is a research aid, not
-an importer (never touches the database), and Facebook/Instagram are read
+Same ground rules as both other market skills: the file goes into the app
+repo's `database/markets/` and is loaded into the local database with
+`market:import-pending` (dry run first), and Facebook/Instagram are read
 through the user's own logged-in browser session via the Chrome extension
 tools, never `WebFetch` or a raw request. **Read
 `../find-bc-markets/references/market-xml-schema.md` before writing any
@@ -84,10 +85,11 @@ carry-forward rule for anything that matches a baseline market.
    "Scoring a one-time event" variant in the pop-up section for anything
    without a recurring schedule. Don't reinvent the rubric here.
 
-7. **Write the XML and report as a diff.** Save to
-   `~/Documents/market-research/` (create it if needed), named
-   `social-scan-<scope>-<YYYY-MM-DD>.xml`. Structure the summary the same
-   way `find-bc-markets` step 9 does, plus:
+7. **Write the XML, import it, and report as a diff.** Follow "Saving and
+   importing" in `../find-bc-markets/references/market-xml-schema.md`: save
+   to `database/markets/YYYY-MM-DD-NN-social-scan-<scope>.xml` in the app
+   repo, dry run, import, commit. Structure the summary the same way
+   `find-bc-markets` step 9 does, plus:
 
    - **Flagged as possible non-vendor-market** -- added to the XML anyway
      per the screen, with the specific red flag named.
@@ -95,8 +97,6 @@ carry-forward rule for anything that matches a baseline market.
      summary only, not written to the XML, with the one-line reason.
    - **Groups found but private** -- named only, so the user can request
      access themselves if they want.
-
-   Same rule as both other skills: **don't import the file yourself.**
 
 ## Known groups worth checking every run
 

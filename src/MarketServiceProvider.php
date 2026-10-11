@@ -3,9 +3,11 @@
 namespace Cultpantry\Market;
 
 use App\Support\AdminNav;
+use Cultpantry\Market\Console\ImportPendingCommand;
 use Cultpantry\Market\Console\WarmDriveTimes;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Policies\MarketPolicy;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -33,10 +35,17 @@ class MarketServiceProvider extends ServiceProvider
         //     host app's own resource tree to be found.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'market');
 
-        // 2c. `php artisan market:warm-drive-times`.
+        // 2c. `php artisan market:warm-drive-times`, and
+        //     `market:import-pending`, which loads the research files committed
+        //     to the host app's database/markets/ folder that aren't in the
+        //     ledger yet; it runs from the deploy script and hourly as a
+        //     safety net.
         if ($this->app->runningInConsole()) {
-            $this->commands([WarmDriveTimes::class]);
+            $this->commands([WarmDriveTimes::class, ImportPendingCommand::class]);
         }
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $schedule->command('market:import-pending')->hourly()->withoutOverlapping();
+        });
 
         // 3. Nav entry. 'match' covers every market/* sub-page so the
         //    sidebar entry stays highlighted across Index/Create/Edit.

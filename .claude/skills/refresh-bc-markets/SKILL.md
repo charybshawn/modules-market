@@ -12,8 +12,9 @@ alone. This is the maintenance counterpart to `find-bc-markets`: that skill
 discovers new markets for a place the user names; this one starts from the
 current market list and asks "is what's on file still true?"
 
-Like `find-bc-markets`, this is a research aid, not an importer -- it never
-touches the database. The user reviews the XML and imports it by hand.
+Like `find-bc-markets`, it writes the file into the app repo's
+`database/markets/` folder and loads it into the local database with
+`php artisan market:import-pending` (dry run first).
 
 **Read `../find-bc-markets/references/market-xml-schema.md` before writing
 any output**, especially the "full overwrite on re-import" note -- it's the
@@ -222,14 +223,15 @@ the user can fill it in by hand.
      belongs in the module -- don't deactivate or remove it yourself.
 
 6. **Write the XML and report as a diff**, exactly following
-   `find-bc-markets` step 9's format and file location
-   (`~/Documents/market-research/`, named
-   `refresh-<scope-or-date>-<YYYY-MM-DD>.xml`) and its emphasis on flagging
+   `find-bc-markets` step 9's format, and "Saving and importing" in
+   `../find-bc-markets/references/market-xml-schema.md` for the file
+   (`database/markets/YYYY-MM-DD-NN-refresh-<scope>.xml`, dry run, import,
+   commit), and its emphasis on flagging
    uncertainty rather than resolving it. Structure the summary around the
    classifications in step 5 above rather than step 9's "New markets found"
    framing, since nothing here is new. Include a "Structure added"
    group: the count of schedules backfilled with days/times, plus a named
-   list of any that are only partly structured. **Don't import the file yourself.**
+   list of any that are only partly structured.
 
 ## A note on scale and pacing
 

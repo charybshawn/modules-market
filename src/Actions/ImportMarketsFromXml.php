@@ -33,13 +33,25 @@ class ImportMarketsFromXml
      */
     public function handle(UploadedFile $file): array
     {
+        return $this->handleString((string) file_get_contents($file->getRealPath()));
+    }
+
+    /**
+     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int}
+     */
+    public function handleString(string $contents): array
+    {
         libxml_use_internal_errors(true);
-        $xml = simplexml_load_string((string) file_get_contents($file->getRealPath()));
+        $xml = simplexml_load_string($contents);
 
         if ($xml === false) {
             $errors = collect(libxml_get_errors())->pluck('message')->map(trim(...))->implode('; ');
             libxml_clear_errors();
             throw new RuntimeException($errors !== '' ? "Invalid XML: {$errors}" : 'Invalid XML: could not be parsed.');
+        }
+
+        if ($xml->getName() !== 'markets') {
+            throw new RuntimeException("Invalid XML: expected a <markets> root element, found <{$xml->getName()}>.");
         }
 
         $created = 0;
@@ -171,6 +183,42 @@ class ImportMarketsFromXml
             'unknown_towns' => array_values($unknownTowns),
             'ignored_updated' => $ignoredUpdated,
         ];
+    }
+
+    /**
+     * @param  array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int}  $result
+     */
+    public function summarize(array $result): string
+    {
+        $plural = fn (int $n, string $word) => $n.' '.$word.($n === 1 ? '' : 's');
+
+        $message = "Imported {$result['created']} new and updated {$result['updated']} existing markets.";
+        if ($result['unchanged'] > 0) {
+            $message .= ' '.$plural($result['unchanged'], 'existing market').' matched with no changes -- left alone.';
+        }
+        if ($result['skipped'] > 0) {
+            $message .= ' Skipped '.$plural($result['skipped'], 'row').' missing a name.';
+        }
+        if ($result['schedules'] > 0) {
+            $message .= ' Imported '.$plural($result['schedules'], 'schedule').'.';
+        }
+        if ($result['schedules_skipped'] > 0) {
+            $message .= ' Skipped '.$plural($result['schedules_skipped'], 'schedule').' missing a valid liveness score (0-4).';
+        }
+        if ($result['ignored_updated'] > 0) {
+            $message .= ' '.$result['ignored_updated'].' of the updated market'.($result['ignored_updated'] === 1 ? ' is' : 's are').' ignored and stay'.($result['ignored_updated'] === 1 ? 's' : '').' hidden.';
+        }
+        if ($result['deactivated'] > 0) {
+            $message .= ' Marked '.$plural($result['deactivated'], 'market').' inactive (liveness score '.Market::DEACTIVATE_AT_OR_BELOW.' or below).';
+        }
+        if ($result['unknown_towns'] !== []) {
+            $message .= ' Not in the places list: '.implode(', ', $result['unknown_towns'])." -- those markets are flagged and won't show up in a distance search until the town is added to the module's bc-places.json.";
+        }
+        if ($result['region_unmatched'] > 0) {
+            $message .= ' '.$plural($result['region_unmatched'], 'row')." had a region that didn't match the controlled list -- imported without one, set it by hand on that market's Edit page.";
+        }
+
+        return $message;
     }
 
     /**

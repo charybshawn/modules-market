@@ -420,33 +420,7 @@ class MarketController extends Controller implements HasMiddleware
                 ->with('error', $e->getMessage());
         }
 
-        $message = "Imported {$result['created']} new and updated {$result['updated']} existing markets.";
-        if ($result['unchanged'] > 0) {
-            $message .= " {$result['unchanged']} existing market".($result['unchanged'] === 1 ? '' : 's').' matched with no changes -- left alone.';
-        }
-        if ($result['skipped'] > 0) {
-            $message .= " Skipped {$result['skipped']} row".($result['skipped'] === 1 ? '' : 's')." missing a name.";
-        }
-        if ($result['schedules'] > 0) {
-            $message .= " Imported {$result['schedules']} schedule".($result['schedules'] === 1 ? '' : 's').'.';
-        }
-        if ($result['schedules_skipped'] > 0) {
-            $message .= " Skipped {$result['schedules_skipped']} schedule".($result['schedules_skipped'] === 1 ? '' : 's')." missing a valid liveness score (0-4).";
-        }
-        if ($result['ignored_updated'] > 0) {
-            $message .= " {$result['ignored_updated']} of the updated market".($result['ignored_updated'] === 1 ? ' is' : 's are').' ignored and stay'.($result['ignored_updated'] === 1 ? 's' : '').' hidden.';
-        }
-        if ($result['deactivated'] > 0) {
-            $message .= " Marked {$result['deactivated']} market".($result['deactivated'] === 1 ? '' : 's').' inactive (liveness score '.Market::DEACTIVATE_AT_OR_BELOW.' or below).';
-        }
-        if ($result['unknown_towns'] !== []) {
-            $message .= ' Not in the places list: '.implode(', ', $result['unknown_towns'])." -- those markets are flagged and won't show up in a distance search until the town is added to the module's bc-places.json.";
-        }
-        if ($result['region_unmatched'] > 0) {
-            $message .= " {$result['region_unmatched']} row".($result['region_unmatched'] === 1 ? '' : 's')." had a region that didn't match the controlled list -- imported without one, set it by hand on that market's Edit page.";
-        }
-
-        return redirect()->route('admin.market.index')->with('success', $message);
+        return redirect()->route('admin.market.index')->with('success', $importMarketsFromXml->summarize($result));
     }
 
     /**

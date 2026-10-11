@@ -56,6 +56,12 @@ read-only: the import never reads them, so an ignored market that ends up in
 your XML is harmless (its details update and it stays ignored), and you
 can't ignore or un-ignore a market by editing them.
 
+**Then layer on research that hasn't reached production yet.** Files in the
+app repo's `database/markets/` folder named after the export's date (or not
+yet pushed) may not be in it. For any market they contain, use the newest
+file's entry as the baseline instead of the export's, since carrying forward
+the export's older entry would undo that research on import.
+
 ## 2. A local cultpantry checkout (fallback)
 
 Use this only if the user can't get an export, or explicitly asks for

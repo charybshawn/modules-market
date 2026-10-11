@@ -8,10 +8,10 @@ description: Research British Columbia artisan/farmer's markets for a specific c
 Researches real farmer's/artisan markets in British Columbia and writes an
 XML file shaped for the modules-market admin panel's Import XML feature
 (`POST /admin/market/import`, handled by
-`Cultpantry\Market\Actions\ImportMarketsFromXml`). This is a research aid,
-not an importer — it never touches the database itself. The user reviews the
-XML and imports it by hand through the admin UI, same as any hand-written
-import file.
+`Cultpantry\Market\Actions\ImportMarketsFromXml`). It writes the file into the
+app repo's `database/markets/` folder and loads it into the local database
+with `php artisan market:import-pending` (dry run first); see "Saving and
+importing" in `references/market-xml-schema.md`.
 
 **Read `references/market-xml-schema.md` before writing any output.** It has
 the exact field list, the controlled `region`/`frequency` value lists, and a
@@ -395,16 +395,13 @@ matters:
    dropped, and knows a real defunct-check on it (visiting its actual page)
    would need a dedicated look rather than relying on this pass's absence.
 
-9. **Write the XML and hand it off as a diff, not a flat report.** Save the
-   file to `~/Documents/market-research/` (create it if it doesn't exist
-   yet), named `<city-or-region>-markets-<YYYY-MM-DD>.xml`. This is
-   deliberately **not** the session's scratchpad directory — the scratchpad
-   is a temp path buried under a session ID, which is fine for intermediate
-   working files but a bad place to leave something the user needs to find
-   again in a native file picker (Finder, or the admin panel's own "Choose
-   File" dialog) later. `~/Documents/market-research/` is stable and easy to
-   navigate to by hand every time. Tell the user the path, and structure the
-   summary around what step 2's baseline makes visible:
+9. **Write the XML, import it, and hand it off as a diff, not a flat
+   report.** Follow "Saving and importing" in
+   `references/market-xml-schema.md`: save it to the app repo's
+   `database/markets/` folder as `YYYY-MM-DD-NN-<city-or-region>.xml`, dry
+   run `php artisan market:import-pending` and fix what it reports, import,
+   and commit. Tell the user the path and the import summary, and structure
+   the summary around what step 2's baseline makes visible:
 
    - **New markets found** — same as a from-scratch run: how many, their
      liveness scores if below 4/4, and anything excluded as likely-defunct
@@ -426,9 +423,7 @@ matters:
 
    On a first run for a new scope, the baseline is empty, so this collapses
    back to a flat "found N markets" report — the diff framing costs nothing
-   when there's nothing to diff against yet. **Don't import the file
-   yourself** — that's a deliberate step the user takes through the admin
-   panel's Import XML button, reviewing the file first.
+   when there's nothing to diff against yet.
 
 ## One-time, pop-up and past-event markets
 
