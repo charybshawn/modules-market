@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use Cultpantry\Market\Actions\ExportMarketsToPdf;
 use Cultpantry\Market\Actions\ExportMarketsToXml;
 use Cultpantry\Market\Actions\FetchMarkets;
-use Cultpantry\Market\Actions\ImportMarketsFromXml;
 use Cultpantry\Market\Contracts\MarketHistory;
 use Cultpantry\Market\Events\MarketRecordDeleted;
 use Cultpantry\Market\Events\MarketRecordSaved;
@@ -404,31 +403,11 @@ class MarketController extends Controller implements HasMiddleware
             ->with('success', "Market '{$name}' deleted.");
     }
 
-    public function import(Request $request, ImportMarketsFromXml $importMarketsFromXml): RedirectResponse
-    {
-        $this->authorize('import', Market::class);
-
-        $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:xml', 'max:5120'],
-        ]);
-
-        try {
-            $result = $importMarketsFromXml->handle($validated['file']);
-        } catch (\RuntimeException $e) {
-            return redirect()
-                ->route('admin.market.index')
-                ->with('error', $e->getMessage());
-        }
-
-        return redirect()->route('admin.market.index')->with('success', $importMarketsFromXml->summarize($result));
-    }
-
     /**
      * Downloads every market (active and inactive alike -- this is for
      * migrating the whole table to another server, not a filtered report)
-     * as the same XML shape ImportMarketsFromXml reads, so the file this
-     * produces can be dropped straight onto another server's Import XML
-     * form. A plain GET returning a raw file response rather than an
+     * as the same XML shape ImportMarketsFromXml reads -- the baseline the
+     * market research passes start from. A plain GET returning a raw file response rather than an
      * Inertia page, same pattern as InventoryController::generateReport()
      * in the main app. Must be linked with a plain <a href>, not Inertia's
      * <Link> -- confirmed by hand that <Link> intercepts the click, gets a

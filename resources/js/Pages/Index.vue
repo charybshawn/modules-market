@@ -15,17 +15,6 @@
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <input ref="fileInput" type="file" accept=".xml,text/xml,application/xml" class="hidden" @change="handleFileChange" />
-          <button
-            type="button"
-            :disabled="importForm.processing"
-            title="Re-importing an updated file safely updates existing markets (matched on name + city) instead of duplicating them."
-            class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
-            @click="fileInput?.click()"
-          >
-            <span v-if="importForm.processing">Importing...</span>
-            <span v-else>Import XML</span>
-          </button>
           <!-- Plain <a>, not Inertia's <Link>: <Link> intercepts the click
                and treats the file response (no X-Inertia header) as a
                failed page visit -- confirmed by hand, it shows a blank
@@ -33,7 +22,7 @@
                file. A native anchor isn't intercepted at all. -->
           <a
             :href="route('admin.market.export')"
-            title="Downloads every market (active and inactive) as an XML file shaped for this same Import XML form -- for moving the whole list to another server."
+            title="Downloads every market (active and inactive) as an XML file in the research import format -- the baseline the market research passes start from."
             class="tap-target-touch inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
           >
             Export XML
@@ -69,7 +58,7 @@
       <!-- Mobile-only hero block, matching Admin/Dashboard.vue and
            Admin/Inventory/Dashboard.vue's own hero shell exactly (same
            colored card, w-16 h-16 rounded-2xl tile, Archivo Black label).
-           Two tiles: Add Market, Import XML. -->
+           Tiles: Add Market, Export XML, Download PDF. -->
       <div class="md:hidden mb-6 rounded-lg bg-gray-200 dark:bg-amber-500 px-5 pt-[30px] pb-[20px]">
         <div class="text-center">
           <div class="text-sm font-bold text-gray-800">Active Markets</div>
@@ -86,21 +75,6 @@
               </svg>
             </Link>
             <span class="text-xs font-['Archivo_Black'] uppercase tracking-wide text-amber-500 dark:text-white leading-tight text-center">Add<br>Market</span>
-          </div>
-
-          <div class="flex flex-col items-center gap-3">
-            <input ref="fileInputMobile" type="file" accept=".xml,text/xml,application/xml" class="hidden" @change="handleFileChange" />
-            <button
-              type="button"
-              :disabled="importForm.processing"
-              class="tap-target-touch w-16 h-16 rounded-2xl bg-white dark:bg-gray-900 shadow-md dark:shadow-[0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-center disabled:opacity-50"
-              @click="fileInputMobile?.click()"
-            >
-              <svg class="w-11 h-11 text-amber-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M7 10l5 5 5-5M12 15V3" />
-              </svg>
-            </button>
-            <span class="text-xs font-['Archivo_Black'] uppercase tracking-wide text-amber-500 dark:text-white leading-tight text-center">Import<br>XML</span>
           </div>
 
           <div class="flex flex-col items-center gap-3">
@@ -137,8 +111,6 @@
           Market Calendar
         </Link>
       </div>
-
-      <FormErrorSummary v-if="Object.keys(importForm.errors).length" :errors="importForm.errors" class="mb-6" />
 
       <p v-if="props.routingProblem" class="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200" role="status">
         {{ props.routingProblem }}
@@ -286,11 +258,10 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
-import { Link, useForm } from '@inertiajs/vue3'
+import { Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
 import DataTable, { type Column } from '@/Components/Admin/DataTable.vue'
-import FormErrorSummary from '@/Components/Admin/FormErrorSummary.vue'
 import { useAdminIndexTable } from '@/composables/useAdminIndexTable'
 import ScheduleLiveFilters from './Partials/ScheduleLiveFilters.vue'
 import NearFilter from './Partials/NearFilter.vue'
@@ -577,36 +548,6 @@ const columns = computed<Column[]>(() => [
   // DataTable's own empty-value handling couldn't.
   { key: 'liveness_score', label: 'Liveness', sortable: true, hideable: true },
 ])
-
-// A plain useForm (not usePersistedForm) -- a File object can't be
-// serialized to localStorage, and a draft file selection wouldn't survive
-// a reload anyway. Same shape as cultpantry/costing's KitchenRentals import.
-const importForm = useForm<{ file: File | null }>({ file: null })
-const fileInput = ref<HTMLInputElement | null>(null)
-const fileInputMobile = ref<HTMLInputElement | null>(null)
-
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0] ?? null
-  if (!file) return
-
-  importForm.file = file
-  importForm.post(route('admin.market.import'), {
-    forceFormData: true,
-    // Remount the whole page on success (fresh list with the new markets);
-    // keep it on a validation error so the form and its errors survive.
-    preserveState: (page) => Object.keys(page.props.errors ?? {}).length > 0,
-    onSuccess: () => { importForm.reset() },
-    // Cleared either way -- picking the same file again wouldn't otherwise
-    // fire a new 'change' event, since its value never changed from the
-    // input's own perspective. Both inputs share one form, so both are
-    // cleared regardless of which one triggered the upload.
-    onFinish: () => {
-      if (fileInput.value) fileInput.value.value = ''
-      if (fileInputMobile.value) fileInputMobile.value.value = ''
-    },
-  })
-}
 
 // The injected helper, not the global route(): this computed runs during
 // render, and the global only exists in the browser -- server-side

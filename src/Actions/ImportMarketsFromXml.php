@@ -6,7 +6,6 @@ use Cultpantry\Market\Events\MarketRecordSaved;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Models\MarketSchedule;
 use Cultpantry\Market\Support\LegacyScheduleDetail;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use RuntimeException;
 use SimpleXMLElement;
@@ -28,14 +27,6 @@ use SimpleXMLElement;
  */
 class ImportMarketsFromXml
 {
-    /**
-     * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int}
-     */
-    public function handle(UploadedFile $file): array
-    {
-        return $this->handleString((string) file_get_contents($file->getRealPath()));
-    }
-
     /**
      * @return array{created: int, updated: int, unchanged: int, skipped: int, region_unmatched: int, schedules: int, schedules_skipped: int, deactivated: int, unknown_towns: array<int, string>, ignored_updated: int}
      */

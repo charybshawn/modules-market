@@ -2,7 +2,6 @@
 
 use Cultpantry\Market\Actions\ImportMarketsFromXml;
 use Cultpantry\Market\Models\Market;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
@@ -21,10 +20,7 @@ it('files an XML import of a retired northern region under Northern BC', functio
         .'<market><name>Fort Nelson Market</name><city>Fort Nelson</city><region>Northern Rockies</region></market>'
         .'<market><name>Prince George Market</name><city>Prince George</city><region>Northern BC</region></market>'
         .'</markets>';
-    $path = tempnam(sys_get_temp_dir(), 'mk');
-    file_put_contents($path, $xml);
-
-    $result = app(ImportMarketsFromXml::class)->handle(new UploadedFile($path, 'm.xml', 'text/xml', null, true));
+    $result = app(ImportMarketsFromXml::class)->handleString($xml);
 
     expect($result['region_unmatched'])->toBe(0)
         ->and(Market::pluck('region')->unique()->all())->toBe(['Northern BC']);

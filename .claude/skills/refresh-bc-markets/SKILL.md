@@ -7,7 +7,7 @@ description: Re-checks markets ALREADY in the cultpantry Farmer's Markets admin 
 
 Pulls the full list of markets already on file and
 re-verifies each one against current sources, producing an XML file for the
-Import XML feature that updates what changed and leaves everything else
+market import that updates what changed and leaves everything else
 alone. This is the maintenance counterpart to `find-bc-markets`: that skill
 discovers new markets for a place the user names; this one starts from the
 current market list and asks "is what's on file still true?"

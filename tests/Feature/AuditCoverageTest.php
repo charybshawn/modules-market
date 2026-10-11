@@ -14,7 +14,6 @@ it('audits every route in this module that changes data', function () {
         'PATCH admin/market/{market}/ignore',
         'PATCH admin/market/{market}/schedules/{schedule}',
         'POST admin/market',
-        'POST admin/market/import',
         'PUT admin/market/{market}',
     ];
 

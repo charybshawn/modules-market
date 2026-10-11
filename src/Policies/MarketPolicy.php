@@ -33,17 +33,8 @@ class MarketPolicy
     }
 
     /**
-     * Class-level ability for the XML import form, which doesn't act on
+     * Class-level ability for the XML export download, which doesn't act on
      * one existing Market instance.
-     */
-    public function import(User $user): bool
-    {
-        return $user->isAdmin();
-    }
-
-    /**
-     * Class-level ability for the XML export download, same reasoning as
-     * import() above.
      */
     public function export(User $user): bool
     {

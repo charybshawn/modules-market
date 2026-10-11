@@ -18,7 +18,6 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'admin'])->gr
         Route::get('/', [MarketController::class, 'index'])->name('index');
         Route::get('create', [MarketController::class, 'create'])->name('create');
         Route::post('/', [MarketController::class, 'store'])->name('store');
-        Route::post('import', [MarketController::class, 'import'])->name('import');
         Route::get('export', [MarketController::class, 'export'])->name('export');
         Route::get('export-pdf', [MarketController::class, 'exportPdf'])->name('export-pdf');
         // Before {market}, or "calendar" would be bound as a market id.

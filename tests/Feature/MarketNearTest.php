@@ -5,7 +5,6 @@ use Cultpantry\Market\Actions\ImportMarketsFromXml;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Support\Places;
 use Illuminate\Http\Client\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -156,7 +155,7 @@ it('does not ask for a drive within a market\'s own town', function () {
 it('reports towns missing from the places list after an import', function () {
     $xml = '<?xml version="1.0"?><markets><market><name>Somewhere Market</name><city>Nowheresville</city></market>'
         .'<market><name>Fine Market</name><city>Vernon</city></market></markets>';
-    $result = app(ImportMarketsFromXml::class)->handle(UploadedFile::fake()->createWithContent('m.xml', $xml));
+    $result = app(ImportMarketsFromXml::class)->handleString($xml);
 
     expect($result['created'])->toBe(2)->and($result['unknown_towns'])->toBe(['Nowheresville']);
 });

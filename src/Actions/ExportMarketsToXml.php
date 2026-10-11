@@ -9,9 +9,8 @@ use SimpleXMLElement;
 
 /**
  * Builds the `<markets><market>...</market></markets>` XML that
- * ImportMarketsFromXml reads back in -- the export side of that action, so
- * a full market list can be pulled off one server and dropped onto
- * another's Import XML form. Every field the import understands is
+ * ImportMarketsFromXml reads back in -- the export side of that action, and
+ * the baseline the market research passes start from. Every field the import understands is
  * written back out; a null field is omitted entirely rather than written
  * empty, matching the "omit what you didn't find" convention the
  * hand-authored research XML already follows (see

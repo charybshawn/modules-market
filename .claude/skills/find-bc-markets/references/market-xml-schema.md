@@ -279,6 +279,5 @@ Never edit a file after it's imported unless you mean to re-import it: a changed
 file gets a new hash and is imported again. Every entry is a full overwrite, so
 re-importing an old file after newer research has landed rolls those markets
 back. Fix a mistake with a new, later file instead. Files under
-`database/markets/archive/` are history only and are never imported. The admin
-panel's Import XML button still works for one-off files that shouldn't ride
-along with the repo.
+`database/markets/archive/` are history only and are never imported. There is no upload button in the admin
+panel: every import goes through this folder.
