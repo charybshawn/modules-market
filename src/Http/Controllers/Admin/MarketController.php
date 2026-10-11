@@ -604,14 +604,10 @@ class MarketController extends Controller implements HasMiddleware
      */
     private function syncSchedules(Market $market, array $schedules): void
     {
-        $market->schedules()->delete();
-
-        foreach ($schedules as $schedule) {
-            $market->schedules()->create([
-                ...$schedule,
-                'liveness_checked_at' => $schedule['liveness_checked_at'] ?? Carbon::today(),
-            ]);
-        }
+        $market->replaceSchedules(array_map(fn (array $schedule) => [
+            ...$schedule,
+            'liveness_checked_at' => $schedule['liveness_checked_at'] ?? Carbon::today(),
+        ], $schedules));
     }
 
     /**

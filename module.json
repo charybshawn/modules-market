@@ -6,7 +6,9 @@
     "provider": "Cultpantry\\Market\\MarketServiceProvider",
     "tables": [
         "market_markets",
-        "market_schedules"
+        "market_schedules",
+        "market_imports",
+        "market_update_digests"
     ],
     "table_prefix": "market_"
 }

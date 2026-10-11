@@ -142,6 +142,25 @@ class MarketSchedule extends Model
     }
 
     /**
+     * What makes this the same schedule across a replace-all: when and where it
+     * runs, not its notes or liveness score.
+     */
+    public function occurrenceKey(): string
+    {
+        return json_encode([
+            $this->label,
+            $this->frequency,
+            array_values((array) $this->weekdays),
+            $this->week_of_month,
+            $this->start_time ? substr($this->start_time, 0, 5) : null,
+            $this->end_time ? substr($this->end_time, 0, 5) : null,
+            $this->start_date?->toDateString(),
+            $this->end_date?->toDateString(),
+            $this->address_line1,
+        ]);
+    }
+
+    /**
      * Enough structure for the calendar to place this schedule on actual days.
      */
     public function isPlaceable(): bool

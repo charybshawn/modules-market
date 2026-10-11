@@ -4,6 +4,7 @@ namespace Cultpantry\Market;
 
 use App\Support\AdminNav;
 use Cultpantry\Market\Console\ImportPendingCommand;
+use Cultpantry\Market\Console\NotifyUpdatesCommand;
 use Cultpantry\Market\Console\WarmDriveTimes;
 use Cultpantry\Market\Models\Market;
 use Cultpantry\Market\Policies\MarketPolicy;
@@ -39,12 +40,15 @@ class MarketServiceProvider extends ServiceProvider
         //     `market:import-pending`, which loads the research files committed
         //     to the host app's database/markets/ folder that aren't in the
         //     ledger yet; it runs from the deploy script and hourly as a
-        //     safety net.
+        //     safety net. `market:notify-updates` then emails users with
+        //     Farmer's Markets access a digest of what's new since its last run
+        //     (first run only sets a baseline).
         if ($this->app->runningInConsole()) {
-            $this->commands([WarmDriveTimes::class, ImportPendingCommand::class]);
+            $this->commands([WarmDriveTimes::class, ImportPendingCommand::class, NotifyUpdatesCommand::class]);
         }
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
             $schedule->command('market:import-pending')->hourly()->withoutOverlapping();
+            $schedule->command('market:notify-updates')->hourlyAt(10)->withoutOverlapping();
         });
 
         // 3. Nav entry. 'match' covers every market/* sub-page so the

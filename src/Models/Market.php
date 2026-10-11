@@ -227,6 +227,30 @@ class Market extends Model
         $query->whereNull('ignored_at');
     }
 
+    /**
+     * Replaces every schedule with $rows. A row that runs on the same days and
+     * times as one it replaces keeps that one's created_at, so created_at says
+     * when a schedule first appeared -- what the update email reports as new --
+     * rather than when it was last re-saved.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    public function replaceSchedules(array $rows): void
+    {
+        $firstSeen = $this->schedules()->get()
+            ->mapWithKeys(fn (MarketSchedule $s) => [$s->occurrenceKey() => $s->created_at])
+            ->all();
+
+        $this->schedules()->delete();
+        $this->schedules()->createMany($rows);
+
+        foreach ($this->schedules()->get() as $schedule) {
+            if (isset($firstSeen[$schedule->occurrenceKey()])) {
+                MarketSchedule::whereKey($schedule->id)->update(['created_at' => $firstSeen[$schedule->occurrenceKey()]]);
+            }
+        }
+    }
+
     public function schedules(): HasMany
     {
         return $this->hasMany(MarketSchedule::class)

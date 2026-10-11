@@ -139,8 +139,7 @@ class ImportMarketsFromXml
                 // so re-importing the same file repeatedly doesn't churn the
                 // schedules table (new row ids, a firehose of "updated"
                 // reports) for data that hasn't changed.
-                $market->schedules()->delete();
-                $market->schedules()->createMany($schedules);
+                $market->replaceSchedules($schedules);
                 $scheduleCount += count($schedules);
             }
 
