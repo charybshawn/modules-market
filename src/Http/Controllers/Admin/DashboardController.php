@@ -1,0 +1,115 @@
+<?php
+
+namespace Cultpantry\Market\Http\Controllers\Admin;
+
+use App\Actions\GetSiteSetting;
+use App\Http\Controllers\Controller;
+use Cultpantry\Market\Actions\BuildUpdateDigest;
+use Cultpantry\Market\Models\Market;
+use Cultpantry\Market\Models\MarketSchedule;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * Landing page for the module (the sidebar link opens it): how many markets
+ * are on file, how they spread across regions, and a day-by-day feed of what
+ * was recently added. Ignored markets are left out of the counts, the same
+ * way the list hides them unless asked.
+ */
+class DashboardController extends Controller implements HasMiddleware
+{
+    /** How many days with additions the feed shows. */
+    public const FEED_DAYS = 10;
+
+    /** How far back the feed looks for them. */
+    public const FEED_LOOKBACK_DAYS = 90;
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware(function ($request, $next) {
+                abort_unless($request->user()?->canAccessAdminPanel(), 403, 'Admin access required.');
+                return $next($request);
+            }),
+            new Middleware(function ($request, $next) {
+                abort_unless(app(GetSiteSetting::class)->handle('modules.cultpantry/market.enabled', true), 404);
+                return $next($request);
+            }),
+        ];
+    }
+
+    public function index(BuildUpdateDigest $digest): Response
+    {
+        $this->authorize('viewAny', Market::class);
+
+        $onFile = Market::query()->notIgnored();
+
+        // Every region in the controlled list, busiest first, then any
+        // markets with no region (or a value outside the list) at the end.
+        $byRegion = (clone $onFile)
+            ->selectRaw('region, count(*) as total, sum(case when is_active then 1 else 0 end) as active')
+            ->groupBy('region')
+            ->get()
+            ->keyBy(fn ($row) => $row->region ?? '');
+
+        $regions = collect(Market::REGIONS)
+            ->map(fn (string $region) => [
+                'region' => $region,
+                'total' => (int) ($byRegion[$region]->total ?? 0),
+                'active' => (int) ($byRegion[$region]->active ?? 0),
+            ])
+            ->sortBy([['total', 'desc'], ['region', 'asc']])
+            ->values();
+
+        $unassigned = $byRegion->reject(fn ($row, $key) => in_array($key, Market::REGIONS, true));
+
+        return Inertia::render('Vendor/market/Dashboard', [
+            'counts' => [
+                'total' => (clone $onFile)->count(),
+                'active' => (clone $onFile)->where('is_active', true)->count(),
+                'ignored' => Market::whereNotNull('ignored_at')->count(),
+            ],
+            'regions' => $regions,
+            'unassigned' => [
+                'total' => (int) $unassigned->sum('total'),
+                'active' => (int) $unassigned->sum('active'),
+            ],
+            'updates' => $this->updates($digest),
+            // This IS the module root, so a single, non-linked crumb.
+            'breadcrumbs' => [['label' => "Farmer's Markets"]],
+        ]);
+    }
+
+    /**
+     * What was added on each of the most recent days that had additions,
+     * newest first, in the update email's words: new markets with their next
+     * date, and new dates on markets already on file. Days whose additions
+     * were all inactive or ignored markets, or dates already past, drop out.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function updates(BuildUpdateDigest $digest): Collection
+    {
+        $from = now()->subDays(self::FEED_LOOKBACK_DAYS);
+        $day = fn ($at) => Carbon::parse($at)->toDateString();
+
+        // Lazy, so the digest is only built for days until the feed is full.
+        return Market::where('created_at', '>', $from)->pluck('created_at')->map($day)
+            ->merge(MarketSchedule::where('created_at', '>', $from)->pluck('created_at')->map($day))
+            ->unique()
+            ->sortDesc()
+            ->lazy()
+            ->map(fn (string $date) => ['date' => $date] + $digest->handle(
+                Carbon::parse($date)->startOfDay()->subSecond(),
+                Carbon::parse($date)->endOfDay(),
+            ))
+            ->filter(fn (array $update) => $update['total'] > 0)
+            ->take(self::FEED_DAYS)
+            ->values()
+            ->collect();
+    }
+}

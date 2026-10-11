@@ -51,11 +51,11 @@ class MarketServiceProvider extends ServiceProvider
             $schedule->command('market:notify-updates')->hourlyAt(10)->withoutOverlapping();
         });
 
-        // 3. Nav entry. 'match' covers every market/* sub-page so the
-        //    sidebar entry stays highlighted across Index/Create/Edit.
+        // 3. Nav entry. It opens the dashboard; 'match' covers every
+        //    market/* sub-page so the entry stays highlighted across them.
         AdminNav::register([
             'name' => "Farmer's Markets",
-            'href' => '/admin/market',
+            'href' => '/admin/market/dashboard',
             'icon' => 'market',
             'match' => '/admin/market',
             'module' => 'cultpantry/market',

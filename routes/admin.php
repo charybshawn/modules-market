@@ -1,5 +1,6 @@
 <?php
 
+use Cultpantry\Market\Http\Controllers\Admin\DashboardController;
 use Cultpantry\Market\Http\Controllers\Admin\MarketController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Route;
 // from this array.
 Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'admin'])->group(function () {
     Route::prefix('market')->name('market.')->group(function () {
+        // The sidebar link opens the dashboard; the list stays at the root URL.
+        Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/', [MarketController::class, 'index'])->name('index');
         Route::get('create', [MarketController::class, 'create'])->name('create');
         Route::post('/', [MarketController::class, 'store'])->name('store');
