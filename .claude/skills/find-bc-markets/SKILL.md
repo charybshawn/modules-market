@@ -6,492 +6,319 @@ description: Research British Columbia artisan/farmer's markets for a specific c
 # Find BC Markets
 
 Researches real farmer's/artisan markets in British Columbia and writes an
-XML file shaped for the modules-market admin panel's Import XML feature
-(`POST /admin/market/import`, handled by
-`Cultpantry\Market\Actions\ImportMarketsFromXml`). It writes the file into the
-app repo's `database/markets/` folder and loads it into the local database
-with `php artisan market:import-pending` (dry run first); see "Saving and
-importing" in `references/market-xml-schema.md`.
+XML file for the modules-market import
+(`Cultpantry\Market\Actions\ImportMarketsFromXml`), saved to the app repo's
+`database/markets/` folder and loaded with `php artisan market:import-pending`.
 
 **Read `references/market-xml-schema.md` before writing any output.** It has
-the exact field list, the controlled `region`/`frequency` value lists, and a
-worked example. Don't reconstruct these lists from memory or guess at new
-region names — they're validated server-side against
-`Cultpantry\Market\Models\Market::REGIONS`/`FREQUENCIES`, so a value outside
-that list either gets silently rejected (frequency falls back to `other`) or
-flagged back at the user as unmatched (region). Getting it right the first
-time saves a round trip.
+the field list, the controlled `region`/`frequency` values (validated
+server-side, so never invent one), the schedule-parsing rules, and "Saving
+and importing".
 
-## Why assisted, not automated
-
-This is a human-in-the-loop research task, not a scraper. Two reasons that
-matters:
-
-- **Facebook and Instagram restrict automated access.** Both are Meta, and
-  their terms don't allow bots scraping pages programmatically. Visiting a
-  page through the Chrome extension, as the user's own logged-in browser
-  session, is a legitimate way to read public content a person could read
-  themselves — hitting their endpoints directly (via `WebFetch` or a raw
-  request) is not, and will also just get blocked or return garbage in
-  practice.
-- **Data quality.** A market's hours, fees, and even whether it still exists
-  change often and get stale on old listings. A human spot-checking a
-  handful of found markets produces cleaner data than a crawler dumping
-  everything a search turns up. Flag anything uncertain rather than
-  resolving it by guessing — see the liveness score and flagging steps
-  below.
+This is human-in-the-loop research, not a crawler: a market's hours, fees and
+even its existence go stale on old listings, so flag anything uncertain
+rather than resolving it by guessing.
 
 ## Workflow
 
-1. **Confirm scope.** If the user gave a city or region, use it directly. If
-   they didn't (e.g. "find some BC markets"), ask which city or region —
-   researching all of BC at once produces a shallow, low-confidence result
-   for a task that's much better done a region at a time.
+1. **Confirm scope.** Use the city or region the user gave. If they gave
+   none, ask: researching all of BC at once gives a shallow, low-confidence
+   result. Broad coverage means several runs, one per region, each with its
+   own reviewable file.
 
-2. **Look up what's already on file for this scope.** This is what
-   makes a repeat run (e.g. a weekly re-check) produce a diff instead of just
-   re-reporting the same markets from scratch. **Follow
-   `references/getting-the-baseline.md`**: ask for the admin panel's Export
-   XML file (preferred: it's production's data and works on any machine),
-   or fall back to a local cultpantry checkout.
+2. **Get the baseline: what's already on file for this scope.** Follow
+   `references/getting-the-baseline.md` (the admin panel's Export XML file,
+   or a local checkout as fallback). Keep the entries whose city or region
+   matches, with **every field**, since step 6's carry-forward rule needs
+   the full entry. This is what turns a repeat run into a diff (step 9). It
+   only reads, so it's safe on a first run too, where it comes back empty.
 
-   Keep the entries whose city or region matches the scope from step 1.
-   Keep every field of each, not just the liveness-relevant ones — you need
-   the full entry on hand, not just enough to score it, because of the
-   carry-forward rule below. The baseline can include **ignored** markets
-   (see "Ignored markets" in `getting-the-baseline.md`) -- the user decided
-   they're not relevant. Never report one as a new find. Writing its entry to
-   update its details is fine: the import updates it and it stays ignored.
-   Don't suggest un-ignoring it, and leave it out of the summary's highlights
-   beyond a one-line "N ignored markets in this area were left as they are".
-   Keep this baseline list in mind through the rest of the research —
-   step 6 compares fresh findings against it, and step 9 reports the diff.
-   This step only reads; nothing about it writes to the database, so it's
-   safe to run every time, including the very first run for a new scope
-   (where it'll just come back empty).
+   The baseline can include **ignored** markets (see that reference). Never
+   report one as a new find. Writing its entry is harmless (it stays
+   ignored); don't suggest un-ignoring it, and mention them only as "N
+   ignored markets in this area were left as they are".
 
-3. **Search broadly first.** Use `WebSearch` to find candidate markets:
-   market directory pages, Destination BC / regional tourism sites,
-   municipal or chamber-of-commerce listings, "best farmers markets in
-   [city]" roundups, and each market's own website if it has one. This step
-   often surfaces the market's Facebook page URL too, which you'll need for
-   step 4.
+3. **Search broadly first.** `WebSearch` for directory pages, Destination BC
+   and regional tourism sites, municipal and chamber listings, "best farmers
+   markets in [city]" roundups, and each market's own site. Note every
+   Facebook/Instagram URL you find for step 4. Then check these **standing
+   sources** directly, every run (step 7 reuses them):
 
-   **Always also check Castanet's events page directly**
-   (`https://www.castanet.net/events`) for the scope's town or region.
-   Castanet covers most of the BC Interior (Okanagan, Shuswap, Kamloops/
-   Thompson, Kootenays) and its events listings regularly carry markets,
-   garlic/harvest festivals and craft fairs that a generic web search
-   misses — treat it as a standing source to check, not just another search
-   term, the same way step 4 treats a market's own Facebook page. The
-   Events page has a region/city picker down the side (Central Okanagan,
-   South Okanagan, North Okanagan, Thompson-Shuswap, Kootenays, Vancouver,
-   each with its own city list) with a `CRAFTS/MARKETS` category filter —
-   pick the scope's actual sub-region rather than reading whatever loads by
-   default (the bare URL defaults to Kelowna/Central Okanagan). Castanet
-   also runs a **separate homepage per region** (e.g.
-   `castanet.net/vernon/` for North Okanagan; the bare `castanet.net/` is
-   Kelowna's) carrying that area's own local news, which is worth a look
-   alongside the events page for closure/relocation stories the second-pass
-   step below searches for.
+   - **Castanet events** (`https://www.castanet.net/events`, `CRAFTS/MARKETS`
+     category) for BC Interior scopes. It carries markets, harvest festivals
+     and craft fairs that web search misses. Pick the scope's town in the
+     region/city picker rather than reading the default (Kelowna). The
+     picker sets `?loc=<city id>`, and towns don't always sit where you'd
+     expect: Salmon Arm (`9`), Sicamous (`31`), Enderby (`19`) and Falkland
+     (`28`) are under **North Okanagan**, while Thompson-Shuswap holds only
+     Kamloops, Sun Peaks, Merritt and Chase. Listings show **one day at a
+     time** (`/events/categories/crafts-markets/YYYY-MM-DD?loc=9`), so check
+     the upcoming weekends, not just today. On 2026-10-11 the Salmon Arm
+     filter returned "no events near you" for every date tried, so an empty
+     result there is weak evidence, not a finding. Castanet also runs a
+     **homepage per region** (`castanet.net/vernon/` for North Okanagan; the
+     bare `castanet.net/` is Kelowna's) with local news worth a look for
+     closure and relocation stories.
+   - **Salmon Arm Observer** (`https://saobserver.net/`) for Shuswap-area
+     scopes (Salmon Arm, Sicamous, Sorrento, Falkland, Enderby and similar).
+     It covers openings, closures, relocations and road-closure approvals
+     that Castanet misses.
+   - **The local radio station's written community calendar**, not its
+     on-air events segment (CKVS 93.7's is audio-only). Confirmed:
+     `myshuswapnow.com/community-calendar/`. Other towns often have a
+     `my<town>now.com`-style equivalent; search "`<town> radio station
+     community events`" rather than guessing the URL.
 
-   **For Shuswap-area scopes (Salmon Arm, Sicamous, Sorrento, Falkland,
-   Enderby and similar), also check the Salmon Arm Observer directly**
-   (`https://saobserver.net/`) — it's the dedicated local paper for that
-   area and regularly covers markets, fairs and festivals (openings,
-   closures, relocations, road-closure approvals) that Castanet's
-   North Okanagan/Thompson-Shuswap coverage doesn't reach as reliably.
+   Most of these block `WebFetch` (403). Read them through the
+   `browser-scrape` skill: `browserless_smartscraper` for a single page, or
+   add them to the step 4 session.
 
-   **Local radio stations are worth checking too, specifically their
-   written community events calendar, not the station's on-air schedule.**
-   Confirmed working example: `myshuswapnow.com/community-calendar/` (Shuswap)
-   is a real, dated, text-searchable calendar of community events —
-   distinct from the station's own on-air "Community Events Calendar"
-   segment, which on at least one Shuswap station (CKVS 93.7) is audio-only
-   and not usable for research. Other BC Interior towns often have an
-   equivalently-branded local station site (a `my<town>now.com`-style
-   domain) with the same kind of calendar — search for "`<town> radio
-   station community events`" to find the right one rather than guessing
-   the URL, since the pattern isn't confirmed for every region.
+4. **Read Facebook and Instagram through Browserless**, never `WebFetch` or
+   the Chrome extension. **Load the `browser-scrape` skill and follow it**,
+   including its Meta section (logged out, ≤40 page views, long waits, no
+   saved `profile` unless the user picks a throwaway account, never their
+   own). Specific to this task:
 
-4. **Visit Facebook and Instagram pages through the browser, not
-   WebFetch.** For any market whose primary online presence is a Facebook
-   page or Instagram profile (common for smaller markets — a market's own
-   website often links both), load the Chrome extension tools first —
-   `ToolSearch("select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__get_page_text")`
-   — then navigate to the page and read its actual content (About section,
-   pinned posts, recent event posts) the same way a person would. Never
-   simulate, guess, or reconstruct what a page probably says — only report
-   what you actually read there.
+   - **One session, one page per call.** Read every URL from step 3 in a
+     single `browserless_agent` session (`keepSessionAlive: true`,
+     residential `ca` proxy). Each call's batch is one page's `goto`, wait
+     and `evaluate`: a batch returns only its last command's result, so two
+     pages in one batch loses the first. Put `reportOutcome` + `close` on
+     the last page's batch, before writing any XML.
+   - **Read only what's there.** Return the page text (About/intro, pinned
+     and recent posts, each post's date) and report only what you read;
+     never reconstruct what a page probably says. Read: the bio (hours and
+     location often live there), the link-in-bio page (an ordinary site),
+     pinned posts, and the latest few posts' dates. Stay read-only: no
+     scrolling whole timelines, and never follow, like, comment, message,
+     or open Stories.
+   - **Dating posts.** A date printed in a post's graphic ("Saturday
+     September 12") is the event's date, not the post's. Logged in, a
+     post's `<time datetime>` gives the exact ISO date. Logged out (verified
+     2026-10-11), Facebook renders no `<time>` elements and shows only one
+     or two posts, dated absolutely ("May 6, 2025") or relatively ("a day
+     ago", "1d"). Convert relative dates against today and say so in
+     `<notes>`. Pinned posts sort first, so take the newest date you see.
+   - **Login walls are a stop, not a puzzle.** Logged out, Instagram shows
+     only the bio and follower count, and Facebook cuts a Page off after a
+     post or two. So an old newest-visible post is the wall, not proof the
+     market went quiet: don't lower a score on it alone. Record what you
+     couldn't see as "unverified (login wall)" in `<notes>`. Never click a
+     login button or type credentials. On a checkpoint, "suspicious
+     activity" or "You're temporarily blocked", close the session at once
+     and tell the user; don't switch proxies or personas to push past it.
 
-   **Instagram needs the user logged in, and that's their step, not yours.**
-   Logged out, Instagram covers the profile with a login dialog and the page
-   text gives you only the bio and follower count — no dated posts, which is
-   the one thing a liveness check needs. If you see that wall ("Log in",
-   "Continue with Facebook"), stop and ask the user to log in themselves in
-   that browser tab, then carry on. Don't click "Continue with Facebook" or
-   any login button and never type credentials — that would be signing in on
-   their behalf. If they'd rather not, record the Instagram page as
-   "unverified (login wall)" in the market's `<notes>` and don't score
-   anything from it.
+5. **Extract fields per the schema.** Fill only what the sources support;
+   missing fields are expected, not gaps to guess at. Always fill
+   `<sources>`.
 
-   Once in, read what a person checking on the market would: the bio (hours
-   and location often live there), the link-in-bio page (an ordinary website,
-   fine to open normally), pinned posts, and the dates on the latest few
-   posts. The profile page text (`get_page_text`) gives you the bio and
-   counts but **not** post dates — the grid is images, and dates printed
-   inside the graphics ("Saturday September 12") are the event's date, not
-   the post's. To get a post's real date, open it and read its `<time>`
-   element with the javascript tool:
-   `[...document.querySelectorAll('time')].map(t => t.getAttribute('datetime'))`
-   returns an exact ISO timestamp including the year. Pinned posts sort
-   first in the grid, so open a few posts and take the newest date rather
-   than assuming the top-left one is the latest. Keep it light and read-only: one profile and a handful of
-   posts per market, a pause between markets, no endless scrolling. Never
-   follow, like, comment, message, or open Stories — story views show up to
-   the account owner as the user's own name. And this is the user's real
-   account: if Instagram shows a challenge, "suspicious activity", or "try
-   again later", stop immediately and tell them rather than pushing on.
+   - **Don't copy a combined listing's dates onto each market.** A tourism
+     page covering two co-located markets gives one date range that usually
+     belongs to just one of them. Take each market's dates from its own site
+     or a per-market directory (e.g. the BC Farmers' Market Trail). Two
+     markets with identical dates and near-identical hours are a red flag to
+     re-check. (Revelstoke's Farm & Craft Market was first given the Local
+     Food Initiative market's Oct 31 end date; its own listing says Oct 10.)
+     When sources disagree, say so in `<notes>` and which one you used.
+   - **Name a sponsor** in `<sponsor>` when the business behind the market
+     differs from its name (a resort restaurant's night market, a brewery's
+     Christmas market). Leave it out when the market runs itself or the
+     sponsor is already in the name.
+   - **One `<schedule>` per distinct run** (summer vs. winter market, a
+     holiday fair at another venue), each **deep-parsed** into `<weekdays>`,
+     `<week_of_month>`, `<start_time>`, `<end_time>` and, only when the
+     source states the year, `<start_date>`/`<end_date>`. These fields are
+     what put a market on the admin calendar; leftover wording goes in the
+     schedule's `<notes>`. Follow the rules and examples in the schema's
+     "Deep-parsing schedules". A schedule you couldn't fully structure is
+     still written, with what's missing in its `<notes>`. No schedule detail
+     at all means no `<schedules>`.
 
-5. **Extract fields per the schema.** For each market, fill in whatever
-   fields the sources actually support — see
-   `references/market-xml-schema.md` for the full list. Most markets won't
-   have every field filled; that's expected, not a gap to paper over by
-   guessing. Always record `sources` (the URL(s) the info came from) so the
-   user can verify anything later.
+6. **Screen it, then score liveness.** Two separate questions, in order:
 
-   **Don't copy a combined listing's dates onto each market.** A tourism page
-   that covers two co-located markets ("a double market experience") gives
-   one date range for the pair, and it's usually just one of them. Take each
-   market's dates from its *own* site or a per-market directory such as the BC
-   Farmers' Market Trail, and treat two markets that end up with identical
-   dates and near-identical hours as a red flag to re-check, not a result.
-   (Revelstoke's Farm & Craft Market was first given the Local Food
-   Initiative market's October 31 end date; its own directory listing says
-   October 10.) When sources disagree on a date, say so in `<notes>` and name
-   which one you used and why.
+   **Is it an independent-vendor market at all?** Run the decision rule in
+   `references/vendor-market-screen.md` on every candidate. A single
+   business's storefront, sale or pop-up shop is excluded (or flagged, if
+   ambiguous), however active it is.
 
-   **Name a sponsor when there is one.** When a market's name differs from the
-   business or organization actually behind it — a night market hosted by a
-   resort's restaurant, a Christmas market put on by a brewery — record that
-   business in `<sponsor>`. If the market is just run by its own
-   organization, or the sponsor is already in the name, leave it out rather
-   than repeating the name.
+   **Does it still run?** Old blog posts and directory listings outlive the
+   markets they describe. Score each market that passes the screen, one
+   point per check:
 
-   **Split distinct schedules out.** When a market runs more than one
-   distinct thing — a summer market and a winter market, a holiday fair at a
-   different venue — write each as its own `<schedule>` rather than
-   squeezing them into one description. Give each a label, its days/hours,
-   and start/end dates *only when the source states the year* (a site that
-   says "starts March 23" with no year gets no date, not a guessed one). A
-   market with one ordinary schedule just gets one `<schedule>`; a market
-   where the research turned up no schedule detail at all gets none.
+   - **Recent activity, in season.** A post on its Facebook/Instagram page
+     or site within roughly the last 12 months, or, if it's off-season, last
+     posts that look like a normal end-of-season wind-down rather than going
+     quiet mid-season. Check the actual date against today.
+   - **Current-year confirmation.** Something dated to *this* year: an
+     upcoming event, "2026 season" language, a current vendor application.
+     "Every Saturday" with no date anywhere doesn't count.
+   - **Live website**, if it has one: loads and reads like the market's own
+     current content, not a parked domain or placeholder. No website at all
+     means skip this check, not fail it.
+   - **Corroboration.** Two independent sources agree it's operating (not
+     copies of each other). A market's own Facebook and Instagram together
+     count as one source.
 
-   **Deep-parse every schedule down to days and times.** The admin calendar
-   places markets using `<weekdays>`, `<week_of_month>`, `<start_time>` and
-   `<end_time>`; there is no free-text days-and-hours field. For each
-   schedule, turn the source's wording into those fields: "Saturdays
-   8:30am-12:30pm" becomes `sat` / `08:30` / `12:30`, and "last Sunday of the
-   month" becomes `monthly` / `sun` / `last`. Anything left over (entry fee,
-   vendor count, closures) goes in the schedule's `<notes>`. Split a schedule when different days have
-   different hours, or when a monthly market runs on more than one week.
-   Encode only what the source actually states. Follow the rules and
-   worked examples in `references/market-xml-schema.md` → "Deep-parsing
-   schedules". A schedule you couldn't fully structure still gets
-   written; say what's missing in its `<notes>`.
-
-6. **Screen it as an independent-vendor market, then score liveness before
-   deciding whether to include it.** These are two separate questions —
-   whether it's the *kind* of thing this module tracks at all, and whether
-   it's currently active — so do them in that order. **Read
-   `references/vendor-market-screen.md` and run its decision rule on every
-   candidate first**: some "market"-branded listings turn out to be a single
-   business's storefront, retail sale, or pop-up shop rather than an
-   independent-vendor market, and those get excluded (or flagged, if
-   genuinely ambiguous) regardless of how active they are. A market found on
-   a search doesn't mean it still runs, either — old blog posts and
-   directory listings outlive the markets they describe all the time. Score
-   each market that passes the screen against these four checks, one point
-   each:
-
-   - **Recent activity, in season.** Its Facebook or Instagram page (or site) has a post
-     within roughly the last 12 months, OR it's currently off-season for
-     that market and its last posts look like a normal end-of-season
-     wind-down rather than going quiet mid-season. Check the post's actual
-     date against today's date — don't estimate.
-   - **Current-year confirmation.** Something dated to *this* year
-     specifically: an upcoming event, "2026 season" language, an open
-     vendor application for the current year — not just "every Saturday"
-     with no date attached anywhere.
-   - **Live website**, if it has one. It loads and reads like the market's
-     own current content — not a fetch failure, an expired/parked domain,
-     or an obvious placeholder. (Skip this check, don't penalize for it, if
-     the market has no website at all — plenty of small markets only exist
-     on Facebook.)
-   - **Corroboration.** At least two independent sources (not two pages
-     that clearly just copied each other) agree it's currently operating. A
-     market's own Facebook and Instagram are the same operator, so together
-     they count as one source, not two.
-
-   Don't score follower/like counts — a defunct page keeps its followers
-   forever, so this tells you nothing about whether the market still runs.
-
-   One override beats the score entirely: if anything explicitly says the
-   market is closed, discontinued, or "permanently closed" (Facebook
-   sometimes marks this directly on a Page), treat it as dead regardless of
-   how it scores elsewhere.
-
-   **What the score means:**
+   Don't count followers or likes: a defunct page keeps them forever. An
+   explicit "closed", "discontinued" or "permanently closed" overrides the
+   score: treat it as dead.
 
    | Score | Meaning | What to do |
    |---|---|---|
-   | 4/4 | Confident it's active | Include normally, write `<liveness_score>4</liveness_score>` |
-   | 2-3/4 | Probably active, some gaps | Include, write `<liveness_score>n</liveness_score>`, and add a one-line `Liveness: n/4 — <what's missing>` note in `<notes>` so the gap is visible without opening the admin UI |
-   | 0-1/4, or explicit closure | Likely defunct | Run the step 7 second pass first if you haven't. If it still lands here: don't write a `<market>` entry for a market that isn't in the baseline — mention it in your summary instead ("found mentions of X Market but it looks defunct: `<why>`"), so they know you looked and why you excluded it rather than just missing it. **If it *is* in the baseline, write the entry anyway** with the low score: leaving the old, now-contradicted score on file would be actively misleading. The import then **marks that market inactive automatically** (a market scoring 1 or below is deactivated the moment it's saved), which also hides it from the admin panel's default list — it stays findable via the Status filter, not deleted |
+   | 4/4 | Confident it's active | Include, `<liveness_score>4</liveness_score>` |
+   | 2-3/4 | Probably active, some gaps | Include, and add a one-line `Liveness: n/4 — <what's missing>` to `<notes>` |
+   | 0-1/4, or explicit closure | Likely defunct | Run step 7 first. If it still lands here: a market **not** in the baseline gets no entry, just a summary line ("found mentions of X but it looks defunct: `<why>`"). A baseline market **is** written with the low score, since leaving the old score on file would mislead. **The import marks any market scoring 1 or below inactive**, which hides it from the admin panel's default list (it stays findable via the Status filter). A later higher score never re-activates it |
 
-   The score lands in the modules-market admin panel as its own field
-   (`Market::liveness_score`, filterable/sortable on the Index page) — this
-   is what actually makes low-confidence markets findable later for a
-   re-check, rather than the score being throwaway reasoning that only
-   existed for this one research pass. Leave `<liveness_checked_at>` out
-   unless you're deliberately backdating it (see the schema reference) — it
-   defaults to today, which is correct almost always.
+   The score is a real field (`Market::liveness_score`, filterable on the
+   Index page): it's how low-confidence markets get found for a re-check.
+   Leave `<liveness_checked_at>` out; it defaults to the import date.
 
-   **Score each schedule too — it's required.** The market-level score
-   answers "does this market still exist and run?"; each `<schedule>` needs
-   its own `<liveness_score>` answering "is *this specific schedule*
-   current?" A market can be very much alive while its winter schedule is
-   stale or its Christmas fair hasn't run in years. Apply the same four
-   checks to the schedule itself: recent activity around it, something dated
-   to this year (published dates for an upcoming season count), the website
-   agreeing, and a second source agreeing. A schedule whose season hasn't
-   started yet can't have in-season activity to show, so 3/4 with a note
-   saying so is the honest ceiling when the only evidence is published dates.
-   A schedule can't sensibly score higher than the evidence for its market
-   does. The import skips any schedule missing a valid score and reports it,
-   so never leave one out or guess one to make the file import cleanly.
+   **Score each schedule too; it's required.** The market score asks "does
+   this market still run?", and each `<schedule>`'s `<liveness_score>` asks
+   "is *this* schedule current?" (a live market can have a Christmas fair
+   that stopped years ago). Apply the same four checks to the schedule. A
+   season that hasn't started can't show in-season activity, so 3/4 with a
+   note is the honest ceiling on published dates alone. A schedule can't
+   score higher than its market's evidence. The import skips any schedule
+   without a valid score, so never omit or guess one.
 
-   **If this market matched one already in the baseline from step 2**, this
-   is also the comparison point — classify it as you score it, since you're
-   already looking at the same evidence:
+   **Compare against the baseline.** Match a finding to a baseline row by
+   name (case-insensitive, ignoring minor punctuation) within the same city;
+   don't fuzzy-match across cities. For any match, **build the entry from
+   the baseline row, every field carried forward, and overwrite only what
+   you found new**: an omitted field wipes the stored value on re-import
+   (see the schema reference). Then classify it:
 
-   - **Unchanged.** Score comes out the same (or within 1 point — that's
-     normal noise between two independent passes, not a real change) and
-     the fields you found match what's on file. Still write the `<market>`
-     entry — re-importing it bumps `liveness_checked_at` to today, which is
-     the point of a re-check: it records that someone actually looked again
-     recently, not just that it was once confirmed active. Build this entry
-     from the baseline row itself (every field, carried forward as-is), not
-     from scratch — see the schema reference's note on why an omitted field
-     wipes the existing value on re-import rather than leaving it alone. It
-     doesn't need a mention of its own in the summary beyond the roll-up
-     count; the user doesn't need to re-read a market that didn't change.
-   - **Changed.** Score moved by more than 1 point, went active↔defunct, or
-     a concrete field differs (phone, fees, etc.) from what's on file, or a
-     schedule appeared, disappeared, or moved (match schedules within a
-     market by label; the baseline query includes them). Same carry-forward
-     rule as Unchanged: start from the baseline row and overwrite only the
-     fields that actually changed, not a fresh entry built solely from this
-     pass's findings. Write the entry with the new values, and call this one
-     out by name in the summary with old → new, so it doesn't get buried in
-     a count.
-   - **New.** Doesn't match anything in the baseline. Handle exactly as
-     before — no special treatment needed beyond what step 5-6 already do.
+   - **Unchanged.** Score within 1 point (normal noise between passes) and
+     no field differs. Still write it: re-importing bumps
+     `liveness_checked_at`, recording that someone looked again. Counted in
+     the summary, not named.
+   - **Changed.** Score moved more than 1 point, went active↔defunct, a
+     field differs, or a schedule appeared, disappeared or moved (match
+     schedules by label). Named in the summary with old → new.
+   - **New.** No baseline match; steps 5-6 as normal.
 
-   Match a fresh finding to a baseline row on name (case-insensitive,
-   ignoring minor punctuation/whitespace differences) within the same city —
-   don't try to be clever about fuzzy-matching across cities.
+7. **Second pass on anything that scored 2 or below**, market or single
+   schedule. A low score can just mean the first pass looked in the wrong
+   places. For a schedule, search for that specific event (e.g. "Christmas
+   Craft Fair Salmon Arm 2025"), not the whole market. Roughly three to six
+   targeted searches per item, across the kinds of source that fit:
 
-7. **Second pass on anything that scored 2 or below.** A low score means
-   the first pass couldn't find current evidence — which can just mean it
-   looked in the wrong places (a market can be alive with a neglected
-   Facebook page, or dead with a website that still loads). Before deciding
-   what a low-scoring market or schedule gets, deliberately look somewhere
-   else. This applies to a market scoring 2 or below *and* to any single
-   schedule scoring 2 or below; for a schedule, search for that specific
-   season or event (e.g. "Christmas Craft Fair Salmon Arm 2025") rather than
-   re-researching the whole market.
+   - **Local news and community papers.** The market's name plus "closing",
+     "cancelled", "final season", "new location", "returns". For Interior
+     scopes, the step 3 standing sources, read directly rather than via
+     web search.
+   - **Municipal and venue sources.** The city's events calendar, parks and
+     rec, council agendas or minutes, the venue's own page.
+   - **Current-year program lists.** BC Farmers' Market Nutrition Coupon
+     Program participants, BC Association of Farmers' Markets members, the
+     BC Farmers' Market Trail, regional tourism sites. Check their dates;
+     tourism listings lag.
+   - **The vendor side.** Vendors' own pages or posts saying they'll be at
+     the market this year, or a vendor application with current dates.
+   - **Maps and review sites.** Google Business Profile ("permanently
+     closed", newest review dates), Tripadvisor, Yelp.
+   - **Web archive.** When the market's site was last actually changed, not
+     just whether it loads.
+   - **Facebook or Instagram**, if a page, event or vendor post turns up,
+     exactly as in step 4, added to the one session.
 
-   Pick the kinds of source that fit — roughly three to six targeted
-   searches per item, not an exhaustive sweep:
+   Only dated evidence counts; an undated listing or a copied directory
+   entry proves nothing. Outcomes:
 
-   - **Local news and community papers** — the market's name plus words like
-     "closing", "cancelled", "final season", "new location", "returns". For
-     BC Interior scopes, check Castanet directly rather than relying on a
-     general web search: its region-specific homepage (`castanet.net/vernon/`,
-     etc. — not the bare `castanet.net/`, which is Kelowna's) and its events
-     page filtered to the scope's sub-region. For Shuswap-area markets, also
-     check the Salmon Arm Observer directly (`https://saobserver.net/`) and
-     that area's local radio station community calendar
-     (`myshuswapnow.com/community-calendar/`, or search for the equivalent
-     in another town).
-   - **Municipal and venue sources** — the city's events calendar, parks and
-     rec, council agendas or minutes mentioning the market, and the venue's
-     own page (the park, mall, or plaza it's held at).
-   - **Current-year program lists** — the BC Farmers' Market Nutrition Coupon
-     Program's participating markets, BC Association of Farmers' Markets
-     members, the BC Farmers' Market Trail, regional tourism sites. Check the
-     date these show; tourism listings routinely lag.
-   - **The vendor side** — vendors' own pages or Facebook/Instagram posts
-     saying they'll be at the market this year (a vendor tagging the market
-     or using its hashtag is independent of the market's own pages), or a
-     vendor application with current-year dates.
-   - **Maps and review sites** — Google Maps/Business Profile (a "permanently
-     closed" flag, the dates of the newest reviews), Tripadvisor, Yelp.
-   - **Web archive** — the date of the latest archived snapshot of the
-     market's website, and whether its content ever changed. It tells you
-     when the site was last actually touched, not just that it loads.
-   - **Facebook or Instagram, if a page, event, or vendor post turns up** —
-     through the browser only, exactly as in step 4, including the login
-     handoff and the light-touch rules for Instagram.
+   - **Current evidence** (this year, or within 12 months): re-score with
+     it and say what changed the score.
+   - **Explicit closure**: dead, per step 6's override.
+   - **Nothing anywhere**: if you covered at least three different *kinds*
+     of source and found no dated activity in the last 12 months, score it
+     1. That deactivates it on import, so hold to that bar. Fewer than three
+     kinds, or anything inconclusive: leave the score and say what's
+     unchecked.
 
-   Only dated evidence counts. An undated listing doesn't show a market is
-   operating, and a directory entry that copies an older one isn't an
-   independent source. What the pass can conclude:
+   Append `Second pass (<today's date>): searched <kinds of source>; <what
+   was found, or that nothing was>.` to the market's (or schedule's)
+   `<notes>`, so a low score visibly means "checked twice". Silence is
+   evidence, not proof: write "no current evidence found", never "closed",
+   unless something says so. Never contact anyone; if it's still uncertain,
+   list the manager's phone or email in the summary for the user to follow
+   up.
 
-   - **Current evidence turned up** (dated to this year, or within the last
-     12 months). Re-score with it — it feeds the same four checks, so the
-     score can rise. Say what changed the score.
-   - **Explicit closure turned up.** Treat as dead regardless of anything
-     else, per the override in step 6.
-   - **Nothing turned up anywhere.** If you searched at least three
-     different *kinds* of source above and found no dated activity within
-     the last 12 months in any of them, score it 1: the "currently
-     operating" checks aren't met by a website that merely still loads or a
-     directory entry that merely still exists. If you covered fewer than
-     three kinds, or something was inconclusive, leave the score alone and
-     say what's still unchecked.
+8. **Flag, don't resolve, other uncertainty.** Sources disagreeing on
+   hours, fees or location, or a possible duplicate of a known market: say
+   so in `<notes>` and the summary, and let the user decide. A baseline
+   market this pass simply didn't surface is *not* evidence it closed:
+   don't touch its record or score; list it as "not reconfirmed this pass".
 
-   Mind the consequence: a market scored 1 or below is marked inactive
-   when imported and disappears from the admin panel's default list, so a
-   score of 1 from the "nothing turned up" rule isn't a soft note — hold
-   that conclusion to the standard above (three kinds of source, a dated
-   search, not just one thin pass). This only ever deactivates: a later
-   higher score never re-activates a market on its own.
+9. **Write, import, and report a diff.** Follow "Saving and importing" in
+   the schema reference: save as `database/markets/YYYY-MM-DD-NN-<scope>.xml`,
+   dry run `php artisan market:import-pending --dry-run` and fix what it
+   reports, import, and commit. Give the user the path, the import summary,
+   and:
 
-   Record the pass so a low score visibly means "checked twice", not
-   "checked lazily": append `Second pass (<today's date>): searched <kinds
-   of source>; <what was found, or that nothing was>.` to that market's (or
-   schedule's) `<notes>`.
+   - **New markets found**: how many, scores below 4/4, and anything
+     excluded as defunct or not a vendor market, with why.
+   - **Changed**: each named, old → new.
+   - **Reconfirmed, no change**: a count.
+   - **Schedules not fully structured**: each schedule missing
+     `<weekdays>` or times, or a `biweekly` with no anchor date, and why.
+     These don't show on the calendar until filled in.
+   - **Not reconfirmed this pass**: baseline markets this search didn't
+     surface.
+   - **Second-pass results**: what was searched, what turned up, the score
+     change (e.g. 2 → 1), which markets will be **marked inactive on
+     import**, and anything worth a manual phone call.
 
-   Two limits. First, silence is evidence, not proof — even at 1/4 say "no
-   current evidence found", never "closed", unless something actually says
-   so. Second, never contact anyone: no calling the manager, no emailing
-   vendors. If it's still genuinely uncertain, list the manager's phone or
-   email in your summary as a manual follow-up for the user.
-
-8. **Flag, don't resolve, other uncertainty — including baseline markets you
-   couldn't reconfirm.** Beyond liveness: if two sources disagree on hours,
-   fees, or location, or a market might be a duplicate of one you or the
-   user already found, say so in the `<notes>` field and call it out in your
-   summary. Don't silently pick one version of the truth; let the user
-   decide.
-
-   Separately: if a market from the step-2 baseline simply never came up in
-   this pass's searches, that's *not* the same as evidence it closed — a
-   search missing something is common and says nothing on its own. Don't
-   lower its score or touch its record at all. Just list it in the summary
-   as "not reconfirmed this pass" so the user knows it wasn't silently
-   dropped, and knows a real defunct-check on it (visiting its actual page)
-   would need a dedicated look rather than relying on this pass's absence.
-
-9. **Write the XML, import it, and hand it off as a diff, not a flat
-   report.** Follow "Saving and importing" in
-   `references/market-xml-schema.md`: save it to the app repo's
-   `database/markets/` folder as `YYYY-MM-DD-NN-<city-or-region>.xml`, dry
-   run `php artisan market:import-pending` and fix what it reports, import,
-   and commit. Tell the user the path and the import summary, and structure
-   the summary around what step 2's baseline makes visible:
-
-   - **New markets found** — same as a from-scratch run: how many, their
-     liveness scores if below 4/4, and anything excluded as likely-defunct
-     per steps 6-7 (say what you found and why you left it out).
-   - **Changed** — each one named, with what changed (old → new).
-   - **Reconfirmed, no change** — just a count; these don't need detail.
-   - **Schedules not fully structured** — any schedule written without
-     `<weekdays>` or times, or a `biweekly` with no anchor date, and why
-     (e.g. "source gives no hours"). These won't show on the calendar
-     until someone fills them in, so list each one.
-   - **Not reconfirmed this pass** — markets from the baseline this
-     search didn't surface, so the user knows to spot-check them manually
-     if they care.
-   - **Second-pass results** — for every market or schedule that got one in
-     step 7: what you searched, what turned up, and the score change
-     (e.g. 2 → 1). Say plainly which markets will be **marked inactive on
-     import** because they scored 1 or below. Also anything still uncertain
-     that's worth a manual phone call.
-
-   On a first run for a new scope, the baseline is empty, so this collapses
-   back to a flat "found N markets" report — the diff framing costs nothing
-   when there's nothing to diff against yet.
+   On a first run the baseline is empty, so this is just "found N markets".
 
 ## One-time, pop-up and past-event markets
 
-(For the place-less version of this — "see what's new on social media" with
-no city or region named — use `scan-bc-market-socials` instead, which runs
-this same sourcing across a chosen scope's worth of towns rather than one
-named place.)
+(For the place-less "see what's new on social media" version, with no city
+or region named, use `scan-bc-market-socials`.)
 
-Recurring weekly markets are easy to find; the one-off ones — holiday markets,
-craft fairs, harvest and Halloween markets, street festivals — mostly live in
-event listings and community groups, and they repeat annually. Capture the
-past ones too (from 2023 on), because last year's Christmas market is the best
-predictor of next year's.
+Holiday markets, craft fairs, harvest and Halloween markets and street
+festivals mostly live in event listings and community groups, and repeat
+annually. Capture past ones too (from 2023 on): last year's Christmas market
+is the best predictor of next year's.
 
-- **Where to look.** Facebook's event search
+- **Where to look.** Facebook event search
   (`facebook.com/events/search/?q=<town> market`) and the "suggested events"
-  sidebar on any event page; the *search* box of a **public** Facebook group
-  about local events (`.../groups/<id>/search/?q=market`); the pages of venues
-  that host markets (malls, wineries, farms, rec centres); the downtown
-  association's and organizers' own sites; local news, especially council
-  road-closure stories (they name exact dates); and regional roundup guides,
-  which are the best source for *past* editions. Instagram is worth opening
-  for an organizer's known account, not for hashtag browsing — hashtag pages
-  are images with no readable text.
-- **Groups are read-only, and only public ones.** Read a public group the way
-  any visitor could; never join, request access, or post. Private groups can't
-  be read, so just note their names in the summary for the user.
+  sidebar on any event page; the search box of a **public** local-events
+  group (`.../groups/<id>/search/?q=market`); venues that host markets
+  (malls, wineries, farms, rec centres); the downtown association's and
+  organizers' sites; local news, especially council road-closure stories
+  (exact dates); and regional roundup guides, the best source for *past*
+  editions. Open Instagram for an organizer's known account, not hashtags
+  (images, no readable text). All of it goes through Browserless as in
+  step 4; when event or group search hits a login wall, note it and use the
+  other sources rather than retrying.
+- **Groups: public only, read-only.** Never join, request access or post.
+  Note private groups' names in the summary.
 - **Never accept a date without its year.** A Facebook event page's header
-  carries the year — use it. (An event that looked like it might be upcoming,
-  "Dec 7-8", turned out to be 2018.) If only a day and month are given and you
-  can't find the year, leave the schedule's dates out and say so.
-- **Open the source; don't trust a search summary.** Summaries in this
-  environment have merged two different businesses, and returned events in
-  Kelowna and Armstrong for a Salmon Arm search. Confirm the town and the name
-  on the actual page. Keep the import to the area the user asked for (the town
-  plus its immediate neighbours) and list nearby-but-outside finds in the
-  summary instead of importing them.
+  carries it. ("Dec 7-8" that looked upcoming turned out to be 2018.) No
+  year found: leave the dates out and say so.
+- **Open the source; don't trust a search summary.** Summaries here have
+  merged two businesses and returned Kelowna and Armstrong events for a
+  Salmon Arm search. Confirm town and name on the page itself. Import only
+  the requested area (the town plus immediate neighbours); list
+  nearby-but-outside finds in the summary.
 - **How to model them.** A special day of an existing market (Apple Fest at
-  the weekly downtown market) is a `one_time` schedule *on that market* — and
-  since schedules are replaced wholesale on import, re-supply its existing
-  schedules unchanged. A standalone event is its own market with one
-  `one_time` schedule (`start_date` = `end_date` for a single day) for the
-  next or most recent edition; put earlier editions, with their years, in
-  `<notes>`. Say whether an event is borderline (a home show with a
-  marketplace, an agricultural fair) so the user can drop it.
-- **Scoring a one-time event** uses the same four checks, aimed at "is this
-  event real and does it recur?": an upcoming edition confirmed by two
-  *independent* sources, or one that already ran this year, is a 4; one
-  source (only the organizer's own page and event, which count as one) is a
-  3; something last seen two or more years ago is a 2 with a note of what's
-  still unchecked. A brand-new event has no past edition — say so; its
-  repeat is the thing to watch.
-- **Past markets that look dead are still written when the user has asked
-  for past markets to be captured.** The default (step 6) is to leave a
-  brand-new likely-defunct market out, but for a user collecting past events
-  "in case they repeat", write it with its low score: a score of 1 or below
-  imports it as inactive, so it's on file but hidden unless someone includes
-  inactive markets. Say so in the market's notes and in the summary, so the
-  user can drop it from the XML if they'd rather not have it.
+  the weekly downtown market) is a `one_time` schedule *on that market*;
+  schedules are replaced wholesale on import, so re-supply its existing ones
+  unchanged. A standalone event is its own market with one `one_time`
+  schedule (`start_date` = `end_date` for one day) for the next or most
+  recent edition, with earlier editions and their years in `<notes>`. Say
+  when an event is borderline (a home show with a marketplace, an
+  agricultural fair) so the user can drop it.
+- **Scoring a one-time event** asks "is it real and does it recur?": an
+  upcoming edition confirmed by two independent sources, or one that already
+  ran this year, is 4; one source (the organizer's page and event count as
+  one) is 3; last seen two or more years ago is 2, noting what's unchecked.
+  A brand-new event has no past edition; say so.
+- **Past markets that look dead are still written when the user asked for
+  past markets.** Unlike step 6's default, write it with its low score: at 1
+  or below it imports inactive, on file but hidden. Say so in its notes and
+  the summary so the user can drop it.
 - **Flag likely successors, don't merge them.** A new page at the same
   location as a silent old one (a "Community Market Events" page in the same
-  postal code as a market that stopped posting in 2024) is worth a note on
-  both records, but only the user, or the organizer, can say they're the same.
-
-## A note on scale
-
-This works best run per-city or per-region, the way a person would actually
-research it — not as a single pass meant to cover all of BC. If the user
-wants broad coverage, that's naturally several invocations (one per region),
-each producing its own reviewable XML file, rather than one giant unverified
-batch.
+  postal code as a market quiet since 2024) gets a note on both records;
+  only the user or the organizer can say they're the same.
