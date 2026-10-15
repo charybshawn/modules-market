@@ -118,7 +118,14 @@ class MarketController extends Controller implements HasMiddleware
             ->filter(fn (Market $m) => $m->is_active && ! $m->isIgnored())
             ->keyBy('id');
 
+        // A market matches a type through its own type or an upcoming
+        // schedule's, so the schedules are held to the type too: filtering to
+        // Holiday markets shows a farmers' market's Christmas run, not its
+        // summer days. A schedule without its own type has the market's.
+        $types = $filters['market_type'] ?? [];
+
         $allowed = fn (MarketSchedule $s) => $matched->has($s->market_id)
+            && ($types === [] || in_array($s->market_type ?? $s->market->market_type, $types, true))
             && ($matched[$s->market_id]->matched_schedule_ids === []
                 || in_array($s->id, $matched[$s->market_id]->matched_schedule_ids, true));
 
