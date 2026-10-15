@@ -251,10 +251,36 @@ const monthCount = computed(() => props.occurrences.filter((o) => o.date.startsW
 
 // The focused date drives which month VCalendar shows; the toolbar moves it,
 // and a month change reloads just the data props.
-const focus = ref(`${props.month}-01`)
-// Same filters as the market list (FetchMarkets does the work on the server);
-// what the server applied seeds the controls.
-const echoed = Array.isArray(props.filters) ? {} : props.filters ?? {}
+// Same filters as the market list (FetchMarkets does the work on the server).
+// The address bar is the source of truth for what is selected: every change is
+// written to it (router.get with replace), so coming back from a market page
+// lands on the same month and filters, whatever props the history restored.
+// Server props only seed the controls where the URL says nothing.
+const urlState = () => {
+  const q = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
+  const list = (name: string) => [...q.entries()].filter(([k]) => k === name || k.startsWith(`${name}[`)).map(([, v]) => v)
+  const one = (name: string) => q.get(name) ?? undefined
+  return {
+    month: one('month'),
+    search: one('search'),
+    city: list('city'),
+    region: list('region'),
+    market_type: list('market_type'),
+    freq_include: list('freq_include'),
+    freq_exclude: list('freq_exclude'),
+    months: list('months').map(Number),
+    match: one('match'),
+    liveness_min: one('liveness_min'),
+    liveness_max: one('liveness_max'),
+    liveness_unchecked: one('liveness_unchecked'),
+    near: one('near'),
+    radius: one('radius'),
+  }
+}
+const fromUrl = urlState()
+const hasUrlState = typeof window !== 'undefined' && window.location.search !== ''
+const echoed = hasUrlState ? fromUrl : Array.isArray(props.filters) ? {} : props.filters ?? {}
+const focus = ref(`${(hasUrlState && fromUrl.month) || props.month}-01`)
 const search = ref(echoed.search ?? '')
 const cityPicked = ref<string[]>([...(echoed.city ?? [])])
 const regionPicked = ref<string[]>([...(echoed.region ?? [])])
@@ -267,10 +293,18 @@ const months = ref<number[]>((echoed.months ?? []).map(Number))
 const matchMode = ref<'all' | 'any'>(echoed.match === 'any' ? 'any' : 'all')
 const livenessMin = ref(Number(echoed.liveness_min ?? 0))
 const livenessMax = ref(Number(echoed.liveness_max ?? 4))
-const includeUnchecked = ref(!!echoed.liveness_unchecked)
+const includeUnchecked = ref(!!Number(echoed.liveness_unchecked ?? 0))
 const nearTown = ref(echoed.near ?? '')
 const nearRadius = ref(Number(echoed.radius ?? 60))
 
+// Does what the URL asked for match the filters the server applied?
+const sameAsProps = () => {
+  const applied = (Array.isArray(props.filters) ? {} : props.filters ?? {}) as Record<string, unknown>
+  const asked = fromUrl as Record<string, unknown>
+  const norm = (v: unknown) => (Array.isArray(v) ? v.map(String).sort().join(',') : v == null ? '' : String(v))
+  const keys = ['search', 'city', 'region', 'market_type', 'freq_include', 'freq_exclude', 'months', 'match', 'liveness_min', 'liveness_max', 'near']
+  return keys.every((k) => norm(applied[k]) === norm(asked[k]))
+}
 const toggleIn = (list: { value: string[] }, option: string) => {
   list.value = list.value.includes(option) ? list.value.filter((o) => o !== option) : [...list.value, option]
 }
@@ -387,6 +421,9 @@ const goToDay = (date: string) => {
 const isDark = ref(false)
 let observer: MutationObserver | null = null
 onMounted(() => {
+  // Props restored from history (or a stale cache) may not be the URL's month or filters.
+  if (hasUrlState && (focusMonth.value !== props.month || !sameAsProps())) reload()
+
   const root = document.documentElement
   isDark.value = root.classList.contains('dark')
   observer = new MutationObserver(() => (isDark.value = root.classList.contains('dark')))
