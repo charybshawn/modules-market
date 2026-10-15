@@ -2,7 +2,7 @@
   <!-- Wide: the History section wants the room. -->
   <AdminShowShell wide>
     <template #mobile-header>
-      <AdminMobileHeader :title="market.name" :href="route('admin.market.index')" />
+      <AdminMobileHeader :title="market.name" :on-back="goBack" />
     </template>
 
     <!-- Edit is the only icon: Ignore needs words, so it's a labelled
@@ -20,12 +20,15 @@
     </template>
 
     <template #header>
-      <Link
+      <!-- A plain anchor: Inertia's <Link> would visit the list itself. A
+           modified click still opens the list in a new tab. -->
+      <a
         :href="route('admin.market.index')"
         class="hidden md:inline-flex tap-target-touch items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm"
+        @click="onBackClick"
       >
         &larr; Back to Markets
-      </Link>
+      </a>
     </template>
 
     <div class="space-y-8">
@@ -325,6 +328,18 @@ import { recurrenceSummary } from './Partials/scheduleSummary'
 import { useMarketEvents, type HistoryConfig } from './Partials/useMarketEvents'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { hideBreadcrumbOnMobile: true }, () => page) })
+
+// Back goes to the page you came from -- the calendar, a filtered list -- and
+// only falls back to the market list when there is no history (a pasted link).
+const onBackClick = (e: MouseEvent) => {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+  e.preventDefault()
+  goBack()
+}
+const goBack = () => {
+  if (window.history.length > 1) window.history.back()
+  else router.visit(route('admin.market.index'))
+}
 
 interface ScheduleDetail {
   id: number
