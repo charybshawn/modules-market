@@ -41,13 +41,14 @@
                   {{ livenessLabels[row.liveness_score] }}
                 </span>
               </div>
-              <div class="mt-1 text-base font-medium text-gray-900 dark:text-white">{{ row.market_name }}</div>
+              <div class="mt-1 text-base font-medium text-gray-900 dark:text-white">{{ row.title }}</div>
+              <div v-if="row.title !== row.market_name" class="text-sm text-gray-600 dark:text-gray-300">{{ row.market_name }}</div>
               <div class="mt-1 inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                 <span class="w-2 h-2 rounded-sm" :style="{ backgroundColor: marketTypeHex(row.market_type) }" aria-hidden="true"></span>
                 {{ row.market_type || 'No type set' }}
               </div>
               <div v-if="row.label || row.address || row.city" class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                {{ [row.label, [row.address, row.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ') }}
+                {{ [row.title === row.market_name ? row.label : null, [row.address, row.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ') }}
               </div>
             </Link>
           </li>
@@ -77,6 +78,8 @@ export interface MarketDayOccurrence {
   schedule_id: number
   market_id: number
   market_name: string
+  /** The special event's own title, or the market's name. */
+  title: string
   city: string | null
   region: string | null
   label: string | null

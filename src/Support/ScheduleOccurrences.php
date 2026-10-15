@@ -152,11 +152,18 @@ class ScheduleOccurrences
     {
         $market = $schedule->market;
 
+        // A run of another type than its market (a farmers' market's
+        // Christmas market) is a special event: it goes by its own title.
+        $special = $schedule->market_type !== null
+            && $schedule->market_type !== $market->market_type
+            && filled($schedule->label);
+
         return [
             'id' => null,
             'schedule_id' => $schedule->id,
             'market_id' => $market->id,
             'market_name' => $market->name,
+            'title' => $special ? $schedule->label : $market->name,
             'city' => $market->city,
             'region' => $market->region,
             'label' => $schedule->label,

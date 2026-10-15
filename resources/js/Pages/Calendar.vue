@@ -232,7 +232,7 @@ const legend = computed(() => [
 // `timed` events show their time and sort before all-day ones.
 const events = computed(() =>
   props.occurrences.map((o) => ({
-    name: o.market_name,
+    name: o.title,
     start: o.start_time ? `${o.date} ${o.start_time}` : o.date,
     end: o.end_time ? `${o.date} ${o.end_time}` : o.start_time ? `${o.date} ${o.start_time}` : o.date,
     timed: !!o.start_time,
@@ -245,7 +245,7 @@ type CalendarEntry = Record<string, any>
 const occurrenceOf = (e: CalendarEntry) => e.occurrence as Occurrence
 const eventColor = (e: CalendarEntry) => marketTypeHex(occurrenceOf(e).market_type)
 // Timed events already render their start time (in bold) ahead of the name.
-const eventName = ({ input }: { input: CalendarEntry }) => occurrenceOf(input).market_name
+const eventName = ({ input }: { input: CalendarEntry }) => occurrenceOf(input).title
 
 const monthCount = computed(() => props.occurrences.filter((o) => o.date.startsWith(props.month)).length)
 
