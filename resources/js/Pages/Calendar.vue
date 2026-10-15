@@ -10,22 +10,62 @@
           <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Market Calendar</h1>
           <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Market days for every active market, from each schedule's days and hours.</p>
         </div>
-        <div class="grid grid-cols-2 gap-3 md:flex md:items-end">
-          <div>
-            <label for="calendar-region" class="block text-xs font-medium text-gray-500 dark:text-gray-400">Region</label>
-            <select id="calendar-region" v-model="filters.region" :class="selectClass">
-              <option value="">All regions</option>
-              <option v-for="region in regions" :key="region" :value="region">{{ region }}</option>
-            </select>
+        <div class="flex items-end gap-2">
+          <div class="min-w-0 flex-1 md:w-64 md:flex-none">
+            <label for="calendar-search" class="block text-xs font-medium text-gray-500 dark:text-gray-400">Search</label>
+            <input id="calendar-search" v-model="search" type="search" placeholder="Search markets..." :class="selectClass" />
           </div>
-          <div>
-            <label for="calendar-city" class="block text-xs font-medium text-gray-500 dark:text-gray-400">City</label>
-            <select id="calendar-city" v-model="filters.city" :class="selectClass">
-              <option value="">All cities</option>
-              <option v-for="city in cities" :key="city" :value="city">{{ city }}</option>
-            </select>
-          </div>
+          <button
+            type="button"
+            :aria-expanded="showFilters"
+            aria-controls="calendar-filters"
+            :class="[navButtonClass, 'tap-target-touch h-9 shrink-0 gap-1.5 border border-gray-300 dark:border-gray-600 px-3 text-sm font-medium']"
+            @click="showFilters = !showFilters"
+          >
+            Filters
+            <span v-if="activeFilterCount" class="rounded-full bg-indigo-600 px-1.5 text-xs text-white">{{ activeFilterCount }}</span>
+          </button>
         </div>
+      </div>
+
+      <p v-if="props.routingProblem" class="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200" role="status">{{ props.routingProblem }}</p>
+      <p v-else-if="nearTown && props.unlocated" class="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200" role="status">
+        {{ props.unlocated }} market{{ props.unlocated === 1 ? ' has' : 's have' }} no drive time, so {{ props.unlocated === 1 ? "it isn't" : "they aren't" }} included in this search.
+      </p>
+
+      <div v-show="showFilters" id="calendar-filters" class="mb-4 space-y-5 rounded-lg bg-white dark:bg-gray-800 p-4 shadow">
+        <FilterSection v-for="group in chipGroups" :key="group.key" :title="group.title" :summary="group.selected.value.join(', ')">
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="option in group.options"
+              :key="option"
+              type="button"
+              :aria-pressed="group.selected.value.includes(option)"
+              :class="[
+                'tap-target-touch rounded-full border px-3 py-1 text-sm',
+                group.selected.value.includes(option)
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300',
+              ]"
+              @click="group.toggle(option)"
+            >{{ option }}</button>
+          </div>
+        </FilterSection>
+        <div class="border-t border-gray-200 pt-4 dark:border-gray-600">
+          <NearFilter v-model:near="nearTown" v-model:radius="nearRadius" :towns="props.places" class="mb-5" />
+          <ScheduleLiveFilters
+            v-model:freq-states="freqStates"
+            v-model:months="months"
+            v-model:match-mode="matchMode"
+            v-model:liveness-min="livenessMin"
+            v-model:liveness-max="livenessMax"
+            v-model:include-unchecked="includeUnchecked"
+            :frequencies="props.frequencies"
+            :custom-filter-count="customFilterCount"
+            @clear="clearCustomFilters"
+          />
+        </div>
+        <button v-if="activeFilterCount" type="button" class="tap-target-touch text-sm font-medium text-indigo-600 dark:text-indigo-400" @click="clearAll">Clear all filters</button>
       </div>
 
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
@@ -123,8 +163,11 @@ import 'vuetify/styles/core'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AdminMobileHeader from '@/Components/Admin/AdminMobileHeader.vue'
 import IconButton from '@/Components/IconButton.vue'
+import FilterSection from '@/Components/Admin/FilterSection.vue'
+import NearFilter from './Partials/NearFilter.vue'
+import ScheduleLiveFilters from './Partials/ScheduleLiveFilters.vue'
 import MarketDayModal, { type MarketDayOccurrence } from './Partials/MarketDayModal.vue'
-import { formatTime } from './Partials/scheduleSummary'
+import { marketTypeHex, UNTYPED_HEX } from './Partials/marketTypeColors'
 
 defineOptions({ layout: (h, page) => h(AdminLayout, { wide: true, hideBreadcrumbOnMobile: true }, () => page) })
 
@@ -144,13 +187,32 @@ const props = defineProps<{
   month: string
   occurrences: Occurrence[]
   unscheduled: UnscheduledRow[]
-  filters: { region: string; city: string }
+  filters: {
+    search?: string
+    city?: string[]
+    region?: string[]
+    market_type?: string[]
+    freq_include?: string[]
+    freq_exclude?: string[]
+    months?: (number | string)[]
+    match?: 'all' | 'any'
+    liveness_min?: number | string
+    liveness_max?: number | string
+    liveness_unchecked?: boolean | number
+    near?: string
+    radius?: number | string
+  }
+  places: string[]
+  unlocated: number | null
+  routingProblem: string | null
   regions: string[]
   cities: string[]
+  marketTypes: string[]
+  frequencies: Record<string, string>
   livenessLabels: Record<number, string>
 }>()
 
-const selectClass = 'mt-1 block w-full md:w-48 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm'
+const selectClass = 'mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base sm:text-sm'
 const navButtonClass = 'inline-flex items-center justify-center rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
 
 // "YYYY-MM-DD" parsed as a local date, so a timezone offset can't shift the day.
@@ -160,13 +222,11 @@ const localDate = (ymd: string) => {
 }
 const toYmd = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
-// Same thresholds as the liveness dots on the Show page.
-const livenessHex = (score: number) => (score >= 4 ? '#10b981' : score >= 2 ? '#f59e0b' : '#ef4444')
-const legend = [
-  { label: 'Confirmed active', hex: livenessHex(4) },
-  { label: 'Probably active', hex: livenessHex(2) },
-  { label: 'Likely defunct', hex: livenessHex(0) },
-]
+// Chips are coloured by market type; liveness shows in the day's modal.
+const legend = computed(() => [
+  ...props.marketTypes.map((t) => ({ label: t, hex: marketTypeHex(t) })),
+  { label: 'No type set', hex: UNTYPED_HEX },
+])
 
 // VCalendar reads `start`/`end` as "YYYY-MM-DD" or "YYYY-MM-DD HH:mm";
 // `timed` events show their time and sort before all-day ones.
@@ -183,18 +243,88 @@ const events = computed(() =>
 // callback types), so the callbacks take that shape and read `occurrence`.
 type CalendarEntry = Record<string, any>
 const occurrenceOf = (e: CalendarEntry) => e.occurrence as Occurrence
-const eventColor = (e: CalendarEntry) => livenessHex(occurrenceOf(e).liveness_score)
-const eventName = ({ input }: { input: CalendarEntry }) => {
-  const o = occurrenceOf(input)
-  return o.start_time ? `${formatTime(o.start_time)} ${o.market_name}` : o.market_name
-}
+const eventColor = (e: CalendarEntry) => marketTypeHex(occurrenceOf(e).market_type)
+// Timed events already render their start time (in bold) ahead of the name.
+const eventName = ({ input }: { input: CalendarEntry }) => occurrenceOf(input).market_name
 
 const monthCount = computed(() => props.occurrences.filter((o) => o.date.startsWith(props.month)).length)
 
 // The focused date drives which month VCalendar shows; the toolbar moves it,
 // and a month change reloads just the data props.
 const focus = ref(`${props.month}-01`)
-const filters = ref({ ...props.filters })
+// Same filters as the market list (FetchMarkets does the work on the server);
+// what the server applied seeds the controls.
+const echoed = Array.isArray(props.filters) ? {} : props.filters ?? {}
+const search = ref(echoed.search ?? '')
+const cityPicked = ref<string[]>([...(echoed.city ?? [])])
+const regionPicked = ref<string[]>([...(echoed.region ?? [])])
+const typePicked = ref<string[]>([...(echoed.market_type ?? [])])
+const freqStates = ref<Record<string, 'include' | 'exclude'>>({
+  ...Object.fromEntries((echoed.freq_include ?? []).map((k) => [k, 'include'])),
+  ...Object.fromEntries((echoed.freq_exclude ?? []).map((k) => [k, 'exclude'])),
+})
+const months = ref<number[]>((echoed.months ?? []).map(Number))
+const matchMode = ref<'all' | 'any'>(echoed.match === 'any' ? 'any' : 'all')
+const livenessMin = ref(Number(echoed.liveness_min ?? 0))
+const livenessMax = ref(Number(echoed.liveness_max ?? 4))
+const includeUnchecked = ref(!!echoed.liveness_unchecked)
+const nearTown = ref(echoed.near ?? '')
+const nearRadius = ref(Number(echoed.radius ?? 60))
+
+const toggleIn = (list: { value: string[] }, option: string) => {
+  list.value = list.value.includes(option) ? list.value.filter((o) => o !== option) : [...list.value, option]
+}
+const chipGroups = [
+  { key: 'market_type', title: 'Type', options: props.marketTypes, selected: typePicked, toggle: (o: string) => toggleIn(typePicked, o) },
+  { key: 'region', title: 'Region', options: props.regions, selected: regionPicked, toggle: (o: string) => toggleIn(regionPicked, o) },
+  { key: 'city', title: 'City', options: props.cities, selected: cityPicked, toggle: (o: string) => toggleIn(cityPicked, o) },
+]
+
+const includeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'include').map(([k]) => k))
+const excludeFreqs = computed(() => Object.entries(freqStates.value).filter(([, v]) => v === 'exclude').map(([k]) => k))
+const livenessFilterActive = computed(() => livenessMin.value > 0 || livenessMax.value < 4)
+const customFilterCount = computed(
+  () => (includeFreqs.value.length || excludeFreqs.value.length ? 1 : 0) + (months.value.length ? 1 : 0) + (livenessFilterActive.value ? 1 : 0) + (nearTown.value ? 1 : 0),
+)
+const activeFilterCount = computed(
+  () => customFilterCount.value + [typePicked, regionPicked, cityPicked].filter((l) => l.value.length).length + (search.value.trim() ? 1 : 0),
+)
+const showFilters = ref(activeFilterCount.value > 0)
+
+const clearCustomFilters = () => {
+  freqStates.value = {}
+  months.value = []
+  matchMode.value = 'all'
+  livenessMin.value = 0
+  livenessMax.value = 4
+  includeUnchecked.value = false
+  nearTown.value = ''
+  nearRadius.value = 60
+}
+const clearAll = () => {
+  clearCustomFilters()
+  search.value = ''
+  typePicked.value = []
+  regionPicked.value = []
+  cityPicked.value = []
+}
+
+const queryParams = () => ({
+  month: focusMonth.value,
+  search: search.value.trim() || undefined,
+  market_type: typePicked.value.length ? typePicked.value : undefined,
+  region: regionPicked.value.length ? regionPicked.value : undefined,
+  city: cityPicked.value.length ? cityPicked.value : undefined,
+  freq_include: includeFreqs.value.length ? includeFreqs.value : undefined,
+  freq_exclude: excludeFreqs.value.length ? excludeFreqs.value : undefined,
+  months: months.value.length ? months.value : undefined,
+  match: matchMode.value === 'any' ? 'any' : undefined,
+  liveness_min: livenessMin.value > 0 ? livenessMin.value : undefined,
+  liveness_max: livenessMax.value < 4 ? livenessMax.value : undefined,
+  liveness_unchecked: includeUnchecked.value && livenessFilterActive.value ? 1 : undefined,
+  near: nearTown.value || undefined,
+  radius: nearTown.value ? nearRadius.value : undefined,
+})
 const loading = ref(false)
 
 const focusMonth = computed(() => focus.value.slice(0, 7))
@@ -212,12 +342,12 @@ const goToday = () => {
 const reload = () => {
   router.get(
     route('admin.market.calendar'),
-    { month: focusMonth.value, region: filters.value.region || undefined, city: filters.value.city || undefined },
+    queryParams(),
     {
       preserveState: true,
       preserveScroll: true,
       replace: true,
-      only: ['month', 'occurrences', 'unscheduled', 'filters'],
+      only: ['month', 'occurrences', 'unscheduled', 'filters', 'unlocated', 'routingProblem'],
       onStart: () => (loading.value = true),
       onFinish: () => (loading.value = false),
     },
@@ -227,7 +357,16 @@ const reload = () => {
 watch(focusMonth, (month) => {
   if (month !== props.month) reload()
 })
-watch(filters, reload, { deep: true })
+// Debounced: typing in search and dragging the liveness slider fire per step.
+let filterTimer: ReturnType<typeof setTimeout> | undefined
+watch(
+  [search, typePicked, regionPicked, cityPicked, freqStates, months, matchMode, livenessMin, livenessMax, includeUnchecked, nearTown, nearRadius],
+  () => {
+    clearTimeout(filterTimer)
+    filterTimer = setTimeout(reload, 300)
+  },
+  { deep: true },
+)
 
 // Any click inside a day -- its date, a market chip, "+N more", or the empty
 // cell -- bubbles up to VCalendar's click:day and opens that day's schedule;

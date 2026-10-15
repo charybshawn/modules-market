@@ -23,6 +23,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -93,15 +94,14 @@ class MarketController extends Controller implements HasMiddleware
      * weekdays/times. ?month=YYYY-MM picks the month; region and city narrow
      * it. The range covers the grid's leading/trailing outside days too.
      */
-    public function calendar(Request $request): Response
+    public function calendar(Request $request, FetchMarkets $fetchMarkets): Response
     {
         $this->authorize('viewAny', Market::class);
 
-        $filters = $request->validate([
-            'month' => ['nullable', 'date_format:Y-m'],
-            'region' => ['nullable', 'string'],
-            'city' => ['nullable', 'string'],
-        ]);
+        // The market list's filters, minus what has no meaning on a grid
+        // (status -- the calendar is always active markets -- sort, paging).
+        $filters = $request->validate(['month' => ['nullable', 'date_format:Y-m']]
+            + Arr::except($this->listFilterRules(), ['status', 'sort', 'direction', 'page']));
 
         $month = isset($filters['month'])
             ? CarbonImmutable::createFromFormat('Y-m-d', $filters['month'].'-01')->startOfDay()
@@ -111,29 +111,37 @@ class MarketController extends Controller implements HasMiddleware
         $from = $month->subDays(7);
         $to = $month->endOfMonth()->addDays(14);
 
-        $activeMarkets = function ($query) use ($filters) {
-            $query->where('is_active', true)
-                ->notIgnored()
-                ->when($filters['region'] ?? null, fn ($q, $region) => $q->where('region', $region))
-                ->when($filters['city'] ?? null, fn ($q, $city) => $q->where('city', $city));
-        };
+        // The same filtering as the list. A schedule filter (frequency, month)
+        // also narrows to the schedules that matched, so "Weekly" shows only
+        // the weekly runs of a market that has several.
+        $matched = $fetchMarkets->all(Arr::except($filters, ['month']) + ['status' => 'active'])
+            ->filter(fn (Market $m) => $m->is_active && ! $m->isIgnored())
+            ->keyBy('id');
+
+        $allowed = fn (MarketSchedule $s) => $matched->has($s->market_id)
+            && ($matched[$s->market_id]->matched_schedule_ids === []
+                || in_array($s->id, $matched[$s->market_id]->matched_schedule_ids, true));
+
+        $marketIds = $matched->keys()->all();
 
         // Only schedules whose season touches this range get expanded, so
         // past seasons and old one-off events cost nothing.
         $inSeason = MarketSchedule::with('market')
-            ->whereHas('market', $activeMarkets)
+            ->whereIn('market_id', $marketIds)
             ->overlapping($from, $to)
             ->orderBy('id')
             ->get()
+            ->filter($allowed)
             ->filter(fn (MarketSchedule $s) => $s->isPlaceable());
 
         // missingPlacement() is a coarse SQL pre-filter; isPlaceable() stays
         // the single definition of "can go on the grid".
         $unplaced = MarketSchedule::with('market')
-            ->whereHas('market', $activeMarkets)
+            ->whereIn('market_id', $marketIds)
             ->missingPlacement()
             ->orderBy('id')
             ->get()
+            ->filter($allowed)
             ->reject(fn (MarketSchedule $s) => $s->isPlaceable());
 
         return Inertia::render('Vendor/market/Calendar', [
@@ -152,9 +160,18 @@ class MarketController extends Controller implements HasMiddleware
                     'frequency' => $s->frequency,
                     'notes' => $s->notes,
                 ])->values(),
-            'filters' => ['region' => $filters['region'] ?? '', 'city' => $filters['city'] ?? ''],
+            'filters' => (object) Arr::except($filters, ['month']),
+            'unlocated' => fn () => filled($filters['near'] ?? null) ? $fetchMarkets->unplaced : null,
+            'routingProblem' => fn () => match (true) {
+                $fetchMarkets->routingFailed => "Drive times aren't available right now, so this calendar isn't filtered by distance.",
+                $fetchMarkets->originNotFound !== null => "Couldn't find \"{$fetchMarkets->originNotFound}\". Pick a town from the list, or enter a full postal code like V1E 4N2.",
+                default => null,
+            },
+            'places' => fn () => Places::options($this->knownValues('city')),
             'regions' => Market::REGIONS,
             'cities' => $this->knownValues('city'),
+            'marketTypes' => Market::MARKET_TYPES,
+            'frequencies' => Market::FREQUENCIES,
             'livenessLabels' => Market::LIVENESS_LABELS,
         ]);
     }

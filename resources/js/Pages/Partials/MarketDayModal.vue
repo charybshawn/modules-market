@@ -42,6 +42,10 @@
                 </span>
               </div>
               <div class="mt-1 text-base font-medium text-gray-900 dark:text-white">{{ row.market_name }}</div>
+              <div class="mt-1 inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                <span class="w-2 h-2 rounded-sm" :style="{ backgroundColor: marketTypeHex(row.market_type) }" aria-hidden="true"></span>
+                {{ row.market_type || 'No type set' }}
+              </div>
               <div v-if="row.label || row.address || row.city" class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                 {{ [row.label, [row.address, row.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ') }}
               </div>
@@ -66,6 +70,7 @@ import { Link } from '@inertiajs/vue3'
 import ResponsiveModal from '@/Components/ResponsiveModal.vue'
 import IconButton from '@/Components/IconButton.vue'
 import { formatHours } from './scheduleSummary'
+import { marketTypeHex } from './marketTypeColors'
 
 export interface MarketDayOccurrence {
   id: string
@@ -75,6 +80,7 @@ export interface MarketDayOccurrence {
   city: string | null
   region: string | null
   label: string | null
+  market_type: string | null
   date: string
   start_time: string | null
   end_time: string | null

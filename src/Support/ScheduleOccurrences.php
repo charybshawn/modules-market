@@ -160,6 +160,8 @@ class ScheduleOccurrences
             'city' => $market->city,
             'region' => $market->region,
             'label' => $schedule->label,
+            // A schedule can carry its own type (a farmers' market's Christmas run).
+            'market_type' => $schedule->market_type ?? $market->market_type,
             'date' => null,
             'start_time' => $schedule->start_time,
             'end_time' => $schedule->end_time,
